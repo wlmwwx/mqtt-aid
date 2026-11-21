@@ -1,0 +1,31 @@
+[package]
+name = "mqtt-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[features]
+screenshot = ["dep:image"]
+
+[dependencies]
+mqtt-core = { workspace = true }
+mqtt-engine = { workspace = true }
+mqtt-storage = { workspace = true }
+mqtt-ui = { workspace = true }
+eframe = { workspace = true }
+egui = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tokio = { workspace = true }
+rfd = { workspace = true }
+image = { version = "0.25", optional = true, default-features = false, features = ["png"] }
+
+[dev-dependencies]
+rumqttd = "0.20"
+tokio = { version = "1", features = ["full"] }
+
+[[bin]]
+name = "mqtt-assistant"
+path = "src/main.rs"

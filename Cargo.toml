@@ -1,0 +1,29 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+repository = ""
+
+[workspace.dependencies]
+mqtt-core = { path = "crates/mqtt-core" }
+mqtt-engine = { path = "crates/mqtt-engine" }
+mqtt-storage = { path = "crates/mqtt-storage" }
+mqtt-ui = { path = "crates/mqtt-ui" }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros"] }
+rumqttc = { version = "0.25", features = ["use-rustls"] }
+rusqlite = { version = "0.43", features = ["bundled"] }
+keyring = "4"
+rfd = "0.18"
+base64 = "0.22"
+eframe = "0.37"
+egui = "0.37"

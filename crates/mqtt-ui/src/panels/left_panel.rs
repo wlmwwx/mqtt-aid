@@ -1,0 +1,317 @@
+//! The left panel: connections and subscriptions.
+//!
+//! It follows SolidCraft's browser panel: a header with a grip, the panel
+//! title and an overflow menu, and below it a tree of connections with their
+//! subscriptions underneath.
+
+use egui::{Color32, RichText, Ui};
+use mqtt_core::models::{ConnectionStatus, MqttSubscription, PayloadFormat};
+
+use crate::state::{AppCommand, ConnectionView, UiActions, UiState};
+use crate::theme::spacing;
+use crate::widgets::icons::{self, Icon};
+use crate::widgets::panel_header::{self, HeaderAction};
+
+/// The colour of a connection status dot.
+pub fn status_color(status: ConnectionStatus, palette: &crate::theme::Palette) -> Color32 {
+    match status {
+        ConnectionStatus::Connected => palette.success,
+        ConnectionStatus::Connecting | ConnectionStatus::Reconnecting => palette.warning,
+        ConnectionStatus::Error => palette.danger,
+        ConnectionStatus::Disconnected => palette.text_faint,
+    }
+}
+
+/// The connection list and the subscription list.
+pub fn left_panel(
+    ui: &mut Ui,
+    state: &mut UiState,
+    connections: &[ConnectionView],
+    subscriptions: &[MqttSubscription],
+    actions: &mut UiActions,
+) {
+    let action = panel_header::panel_header(ui, "浏览器", |ui| {
+        if ui.button("新建连接…").clicked() {
+            actions.commands.push(AppCommand::NewConnection);
+        }
+        if ui.button("新建订阅…").clicked() {
+            actions.commands.push(AppCommand::NewSubscription);
+        }
+    });
+    if action == HeaderAction::Collapse {
+        state.left_collapsed = !state.left_collapsed;
+    }
+
+    ui.add_space(spacing::GAP);
+
+    if state.left_collapsed {
+        return;
+    }
+
+    section(
+        ui,
+        "连接",
+        connections.len(),
+        AppCommand::NewConnection,
+        actions,
+    );
+
+    if connections.is_empty() {
+        empty(ui, "还没有连接");
+    }
+
+    for view in connections {
+        connection_row(ui, state, view, actions);
+        ui.separator();
+    }
+
+    ui.add_space(spacing::GAP);
+
+    section(
+        ui,
+        "订阅",
+        subscriptions.len(),
+        AppCommand::NewSubscription,
+        actions,
+    );
+
+    if subscriptions.is_empty() {
+        empty(ui, "还没有订阅");
+    }
+
+    for subscription in subscriptions {
+        subscription_row(ui, state, subscription, actions);
+        ui.separator();
+    }
+}
+
+/// A section title with a count and an add button.
+fn section(ui: &mut Ui, title: &str, count: usize, add: AppCommand, actions: &mut UiActions) {
+    ui.horizontal(|ui| {
+        ui.label(
+            RichText::new(title)
+                .strong()
+                .size(11.0)
+                .color(ui.visuals().weak_text_color()),
+        );
+        ui.label(
+            RichText::new(count.to_string())
+                .small()
+                .color(ui.visuals().weak_text_color()),
+        );
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if ui
+                .add(egui::Button::new(RichText::new("+").size(14.0)))
+                .on_hover_text("新建")
+                .clicked()
+            {
+                actions.commands.push(add.clone());
+            }
+        });
+    });
+}
+
+/// The placeholder shown when a list is empty.
+fn empty(ui: &mut Ui, text: &str) {
+    ui.label(
+        RichText::new(text)
+            .small()
+            .italics()
+            .color(ui.visuals().weak_text_color()),
+    );
+    ui.add_space(spacing::GAP);
+}
+
+/// A connection in the tree.
+fn connection_row(
+    ui: &mut Ui,
+    state: &mut UiState,
+    view: &ConnectionView,
+    actions: &mut UiActions,
+) {
+    let selected = state.selected_connection.as_ref() == Some(&view.config.id);
+
+    ui.horizontal(|ui| {
+        let color = status_color(view.status, &state.theme.palette());
+        panel_header::status_dot(ui, color);
+
+        let palette = state.theme.palette();
+        let label = if selected {
+            RichText::new(view.config.name.clone())
+                .color(palette.accent_text)
+                .strong()
+        } else {
+            RichText::new(view.config.name.clone()).color(palette.text)
+        };
+        let name = ui
+            .add(egui::Label::new(label).sense(egui::Sense::click()))
+            .on_hover_text("选择连接");
+        if name.clicked() {
+            state.selected_connection = Some(view.config.id.clone());
+        }
+
+        ui.label(
+            RichText::new(format!("{}:{}", view.config.host, view.config.port))
+                .small()
+                .color(state.theme.palette().text_dim),
+        );
+
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if icons::icon_button(ui, Icon::Trash, "删除连接") {
+                actions.delete_connection.push(view.config.id.clone());
+            }
+            if icons::icon_button(ui, Icon::Pencil, "编辑连接") {
+                actions
+                    .commands
+                    .push(AppCommand::EditConnection(view.config.id.clone()));
+            }
+            let plug = if view.status == ConnectionStatus::Connected
+                || view.status == ConnectionStatus::Reconnecting
+            {
+                Icon::Power
+            } else {
+                Icon::Plug
+            };
+            let tooltip = if view.status == ConnectionStatus::Connected
+                || view.status == ConnectionStatus::Reconnecting
+            {
+                "断开连接"
+            } else {
+                "连接"
+            };
+            if icons::icon_button(ui, plug, tooltip) {
+                if view.status == ConnectionStatus::Connected
+                    || view.status == ConnectionStatus::Reconnecting
+                {
+                    actions.disconnect.push(view.config.id.clone());
+                } else {
+                    actions.connect.push(view.config.id.clone());
+                }
+            }
+        });
+    });
+}
+
+/// A subscription in the tree.
+fn subscription_row(
+    ui: &mut Ui,
+    state: &mut UiState,
+    subscription: &MqttSubscription,
+    actions: &mut UiActions,
+) {
+    ui.horizontal(|ui| {
+        icons::draw(
+            ui.painter(),
+            Icon::Topic,
+            egui::Rect::from_center_size(
+                ui.cursor().left_center() + egui::vec2(6.0, 0.0),
+                egui::vec2(12.0, 12.0),
+            ),
+            ui.visuals().weak_text_color(),
+            1.2,
+        );
+        ui.add_space(12.0);
+
+        let palette = state.theme.palette();
+        let label = if subscription.paused {
+            RichText::new(subscription.display_name())
+                .color(palette.text_dim)
+                .strikethrough()
+        } else {
+            RichText::new(subscription.display_name()).color(palette.text)
+        };
+        let name = ui
+            .add(egui::Label::new(label).sense(egui::Sense::click()))
+            .on_hover_text("选择订阅");
+        if name.clicked() {
+            // The menu bar commands act on the selected subscription.
+            state.selected_subscription = Some(subscription.id.clone());
+        }
+
+        ui.label(
+            RichText::new(format!("QoS {}", subscription.qos))
+                .small()
+                .color(ui.visuals().weak_text_color()),
+        );
+
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if icons::icon_button(ui, Icon::Trash, "取消订阅") {
+                actions.unsubscribe.push((
+                    subscription.connection_id.clone(),
+                    subscription.topic.clone(),
+                ));
+            }
+            let pause = if subscription.paused {
+                Icon::Play
+            } else {
+                Icon::Pause
+            };
+            let tooltip = if subscription.paused {
+                "恢复显示"
+            } else {
+                "暂停显示"
+            };
+            if icons::icon_button(ui, pause, tooltip) {
+                actions
+                    .toggle_subscription_pause
+                    .push(subscription.id.clone());
+            }
+        });
+    });
+
+    ui.horizontal(|ui| {
+        egui::ComboBox::from_id_salt(format!("sub-format-{}", subscription.id))
+            .selected_text(subscription.format.label())
+            .width(80.0)
+            .show_ui(ui, |ui| {
+                for format in [
+                    PayloadFormat::Auto,
+                    PayloadFormat::Text,
+                    PayloadFormat::Hex,
+                    PayloadFormat::Json,
+                    PayloadFormat::Base64,
+                ] {
+                    if ui
+                        .selectable_label(subscription.format == format, format.label())
+                        .clicked()
+                        && subscription.format != format
+                    {
+                        actions
+                            .set_subscription_format
+                            .push((subscription.id.clone(), format));
+                    }
+                }
+            });
+
+        ui.label(
+            RichText::new(subscription.topic.clone())
+                .small()
+                .color(ui.visuals().weak_text_color()),
+        );
+    });
+
+    ui.horizontal(|ui| {
+        for qos in 0..=2u8 {
+            let selected = subscription.qos == qos;
+            if ui.selectable_label(selected, format!("Q{qos}")).clicked() && !selected {
+                actions.set_qos.push((
+                    subscription.connection_id.clone(),
+                    subscription.topic.clone(),
+                    qos,
+                ));
+            }
+        }
+    });
+}
+
+/// A unique identifier for a new entity.
+pub fn new_id() -> String {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static COUNTER: AtomicU64 = AtomicU64::new(1);
+    format!("id-{}", COUNTER.fetch_add(1, Ordering::Relaxed))
+}
+
+/// The default format offered for a new subscription.
+pub fn default_subscription_format() -> PayloadFormat {
+    PayloadFormat::Auto
+}

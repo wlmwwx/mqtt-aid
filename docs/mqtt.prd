@@ -1,0 +1,1035 @@
+# MQTT Assistant — 产品需求文档
+
+| 项目 | 内容 |
+|---|---|
+| 产品名称 | MQTT Assistant |
+| 产品类型 | 原生 MQTT 桌面调试工具 |
+| 版本 | V1.0 |
+| 开发语言 | Rust |
+| GUI | egui + eframe |
+| 渲染 | wgpu |
+| 网络 | rumqttc + Tokio |
+| 数据库 | SQLite |
+| 目标平台 | macOS / Windows / Linux |
+
+---
+
+# 1. 产品定位
+
+## 1.1 产品概述
+
+MQTT Assistant 是一款使用 Rust 开发的跨平台原生 MQTT 桌面客户端。
+
+主要用于 MQTT Broker 连接管理、Topic 订阅、消息发布、实时数据监控和消息格式分析。
+
+产品参考 SolidCraft 的原生 GUI 架构及现代化界面设计理念，使用 egui + eframe 实现，不依赖 Web 前端技术。
+
+## 1.2 核心功能
+
+1. MQTT Broker 连接管理。
+2. 多连接配置和管理。
+3. Topic 订阅管理。
+4. MQTT 消息发布。
+5. 实时消息监控。
+6. Text、HEX、JSON 等数据格式展示。
+7. 消息搜索、过滤和历史记录。
+8. 消息格式转换。
+9. MQTT 5.0 属性展示。
+10. 消息数据统计。
+
+## 1.3 产品设计原则
+
+- 纯 Rust 实现。
+- 原生桌面 GUI。
+- 核心业务与 GUI 解耦。
+- 统一消息数据模型。
+- 异步处理 MQTT 网络任务。
+- 高性能消息列表。
+- 可扩展的数据解析架构。
+- 简洁、现代、专业的 UI。
+
+---
+
+# 2. 技术架构
+
+## 2.1 技术选型
+
+| 分类 | 技术 | 用途 |
+|---|---|---|
+| Language | Rust 2024 | 核心开发语言 |
+| GUI | egui | GUI 控件和布局 |
+| App Framework | eframe | 桌面应用生命周期 |
+| Rendering | wgpu | GPU 渲染 |
+| Window | winit | 窗口管理，由 eframe 集成 |
+| MQTT Client | rumqttc | MQTT 通信 |
+| Async Runtime | Tokio | 异步任务运行时 |
+| Serialization | serde | 数据序列化 |
+| JSON | serde_json | JSON 解析 |
+| Database | SQLite | 本地数据持久化 |
+| Database Driver | rusqlite | SQLite 访问 |
+| Error Handling | thiserror | 错误处理 |
+| Logging | tracing | 日志系统 |
+| Credentials | keyring | 系统凭据管理 |
+| File Dialog | rfd | 原生文件对话框 |
+| Testing | cargo test | 单元和集成测试 |
+
+技术原则：
+
+1. GUI 使用 egui + eframe。
+2. 所有 MQTT 通信使用 rumqttc。
+3. Tokio 在后台运行 MQTT 异步任务。
+4. egui 主线程不执行阻塞网络操作。
+5. 使用 Channel 在 GUI 和 MQTT Engine 之间通信。
+6. 核心业务模块不能直接依赖 egui。
+7. 数据展示层只消费统一消息模型。
+
+## 2.2 系统分层
+
+```text
+MQTT Assistant
+│
+├── Application Layer
+│   ├── App
+│   ├── Workspace
+│   ├── AppState
+│   └── Command Dispatcher
+│
+├── GUI Layer
+│   ├── MainWindow
+│   ├── Sidebar
+│   ├── Toolbar
+│   ├── ConnectionPanel
+│   ├── SubscriptionPanel
+│   ├── MessagePanel
+│   ├── PublishPanel
+│   └── SettingsPanel
+│
+├── Engine Layer
+│   ├── ConnectionManager
+│   ├── SubscriptionManager
+│   ├── PublishManager
+│   ├── MessageManager
+│   └── EventDispatcher
+│
+├── Core Layer
+│   ├── Models
+│   ├── MessageFormat
+│   ├── HexCodec
+│   ├── JsonCodec
+│   ├── TopicFilter
+│   └── Error
+│
+├── Infrastructure Layer
+│   ├── MQTT Client
+│   ├── Tokio Runtime
+│   ├── SQLite
+│   ├── Keyring
+│   └── Logging
+│
+└── External
+    └── MQTT Broker
+```
+
+## 2.3 线程模型
+
+采用 GUI 主线程 + MQTT 后台 Runtime 的设计。
+
+```text
+             GUI Main Thread
+                   |
+                 eframe
+                   |
+              egui update()
+                   |
+            Application State
+                   |
+             Command Channel
+                   |
+                   v
+             Tokio Runtime
+                   |
+             MQTT EventLoop
+                   |
+               rumqttc
+                   |
+               MQTT Broker
+                   |
+             Incoming Event
+                   |
+             Message Channel
+                   |
+              GUI update()
+                   |
+              Message List
+```
+
+要求：
+
+- GUI 线程只处理界面绘制和用户交互。
+- MQTT 网络操作运行在 Tokio 后台线程。
+- 连接管理由 ConnectionManager 统一负责。
+- 消息通过 Channel 从后台传递到 GUI。
+- GUI 使用定时批量消费消息。
+- 不允许 MQTT 网络操作阻塞 UI。
+- 应用关闭时正确停止后台任务。
+
+---
+
+# 3. UI 设计
+
+## 3.1 整体风格
+
+参考 SolidCraft 的原生桌面应用设计理念。
+
+采用：
+
+- 深色和浅色主题。
+- 现代化卡片布局。
+- 统一间距和圆角。
+- 清晰的层级结构。
+- 统一图标风格。
+- 低饱和度配色。
+- 高信息密度。
+- 原生交互体验。
+
+通过 egui 实现所有 UI 控件。
+
+## 3.2 主界面布局
+
+采用三栏式布局。
+
+```text
+┌──────────────────────────────────────────────────────────────┐
+│ MQTT Assistant                  ● Connected      Settings    │
+├──────────────┬──────────────────────────┬────────────────────┤
+│              │                          │                    │
+│ CONNECTIONS  │      MESSAGE MONITOR     │    PUBLISH         │
+│              │                          │                    │
+│ + New        │ Search messages...       │ Topic              │
+│              │                          │                    │
+│ ● Local      │ Time   Topic    QoS Size │ device/001/cmd     │
+│ ○ Test       │                          │                    │
+│ ○ Production │ 10:01  dev/001   0  128B  │ Payload            │
+│              │ 10:02  dev/002   1  256B  │                    │
+│ SUBSCRIPTIONS│ 10:03  dev/001   0  64B   │ {                  │
+│              │                          │   "cmd": "start"   │
+│ + Subscribe  │                          │ }                  │
+│              │                          │                    │
+│ device/#     │                          │ Format: JSON       │
+│ sensor/+     │                          │ QoS: 1             │
+│              │                          │ [ Publish ]        │
+├──────────────┴──────────────────────────┴────────────────────┤
+│ Connected: Local | Received: 128 | Published: 32 | Memory    │
+└──────────────────────────────────────────────────────────────┘
+```
+
+## 3.3 UI 组件
+
+### 顶部工具栏
+
+- 应用名称。
+- 当前连接选择。
+- 连接状态。
+- 快速连接和断开。
+- 主题切换。
+- 设置入口。
+
+### 左侧面板
+
+- Connection List。
+- Subscription List。
+- 新建连接。
+- 新建订阅。
+- 连接状态指示。
+
+### 中间面板
+
+- 消息监控列表。
+- 消息搜索。
+- 消息过滤。
+- 消息详情。
+- Payload 格式切换。
+
+### 右侧面板
+
+- 消息发布。
+- Topic 输入。
+- Payload 编辑器。
+- 数据格式切换。
+- QoS。
+- Retain。
+- Publish 按钮。
+
+### 底部状态栏
+
+- 当前连接。
+- 接收消息数量。
+- 发布消息数量。
+- 消息速率。
+- 当前内存缓存数量。
+
+## 3.4 布局要求
+
+- 左侧面板可调整宽度。
+- 右侧面板可调整宽度。
+- 支持隐藏和展开面板。
+- 中间消息列表自动占用剩余空间。
+- 支持窗口缩放。
+- 支持深色和浅色主题。
+- 支持 DPI 缩放。
+
+---
+
+# 4. 连接管理
+
+## 4.1 功能
+
+支持多个 MQTT Broker 配置。
+
+## 4.2 连接配置
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| Name | String | 连接名称 |
+| Host | String | Broker 地址 |
+| Port | u16 | 端口 |
+| Protocol | Enum | MQTT 3.1.1 / 5.0 |
+| Client ID | String | 客户端 ID |
+| Username | Option | 用户名 |
+| Password | Option | 密码 |
+| Keep Alive | u64 | 心跳时间 |
+| Clean Session | bool | MQTT 3.1.1 |
+| Clean Start | bool | MQTT 5.0 |
+| Auto Reconnect | bool | 自动重连 |
+| TLS | bool | TLS |
+| CA Certificate | Path | CA 证书 |
+| Client Certificate | Path | 客户端证书 |
+| Client Key | Path | 客户端私钥 |
+
+## 4.3 功能要求
+
+- 新建连接。
+- 编辑连接。
+- 删除连接。
+- 连接 Broker。
+- 断开连接。
+- 重新连接。
+- 测试连接。
+- 自动重连。
+- 连接配置持久化。
+
+## 4.4 连接状态
+
+```rust
+enum ConnectionStatus {
+    Disconnected,
+    Connecting,
+    Connected,
+    Reconnecting,
+    Error,
+}
+```
+
+## 4.5 多连接
+
+每个 Broker 对应独立的 MQTT Client 和事件循环。
+
+支持：
+
+- 多连接配置保存。
+- 多连接独立状态。
+- 多连接消息隔离。
+- 多连接独立订阅。
+- 多连接独立发布。
+
+V1.0 支持多个活动连接，但需要提供最大连接数配置，避免资源无限增长。
+
+---
+
+# 5. 订阅管理
+
+## 5.1 功能
+
+管理当前 Broker 的 Topic 订阅。
+
+## 5.2 订阅配置
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| ID | String | 订阅 ID |
+| Connection ID | String | 连接 ID |
+| Topic | String | Topic Filter |
+| QoS | u8 | 订阅 QoS |
+| Alias | Option | 自定义名称 |
+| Format | Enum | 默认展示格式 |
+
+## 5.3 支持操作
+
+- 新建订阅。
+- 取消订阅。
+- 修改 QoS。
+- 暂停消息展示。
+- 恢复消息展示。
+- 删除订阅配置。
+- 保存订阅配置。
+
+## 5.4 Topic 通配符
+
+支持：
+
+```text
+device/+/status
+device/#
+sensor/+/temperature
+```
+
+严格遵循 MQTT Topic Filter 规则。
+
+## 5.5 订阅格式配置
+
+允许每个订阅设置默认展示格式：
+
+```text
+Subscriptions
+├── device/+/status       JSON
+├── device/+/temperature  JSON
+├── device/+/raw          HEX
+└── sensor/#              Text
+```
+
+格式设置仅影响展示，不影响消息原始数据。
+
+---
+
+# 6. 消息发布
+
+## 6.1 发布配置
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| Topic | String | 发布 Topic |
+| Payload | Vec<u8> | 原始数据 |
+| Format | Enum | 数据格式 |
+| QoS | u8 | 0 / 1 / 2 |
+| Retain | bool | 保留消息 |
+
+MQTT 5.0 扩展：
+
+- Content Type。
+- Payload Format Indicator。
+- Message Expiry Interval。
+- Response Topic。
+- Correlation Data。
+- User Properties。
+
+## 6.2 Payload 编辑器
+
+支持：
+
+### Text
+
+普通 UTF-8 文本编辑。
+
+### HEX
+
+十六进制数据编辑。
+
+```text
+01 03 00 00 00 0A C5 CD
+```
+
+要求：
+
+- 支持空格分隔。
+- 支持无空格 HEX。
+- 实时校验。
+- 显示字节长度。
+- 转换为原始 Vec<u8>。
+
+### JSON
+
+支持：
+
+- JSON 编辑。
+- 语法校验。
+- 格式化。
+- 压缩。
+- 缩进调整。
+- 错误提示。
+- JSON Tree View。
+
+由于采用 egui，不使用 Monaco Editor。JSON 编辑器应使用 Rust 自己实现的文本编辑组件或合适的 egui 编辑器扩展。
+
+## 6.3 发布模板
+
+支持保存：
+
+- Topic。
+- Payload。
+- 格式。
+- QoS。
+- Retain。
+
+提供模板列表和快速加载。
+
+---
+
+# 7. 数据格式引擎
+
+## 7.1 设计原则
+
+MQTT Payload 始终是原始字节数组。
+
+统一使用：
+
+```rust
+Vec<u8>
+```
+
+作为数据源。
+
+展示层根据用户选择的格式转换数据。
+
+## 7.2 格式类型
+
+```rust
+enum PayloadFormat {
+    Auto,
+    Text,
+    Hex,
+    Json,
+    Binary,
+    Base64,
+}
+```
+
+## 7.3 Auto
+
+识别规则：
+
+1. 判断是否为合法 UTF-8。
+2. 判断是否为合法 JSON。
+3. 合法 JSON 优先展示 JSON。
+4. 其他可读文本展示 Text。
+5. 非文本数据展示 HEX。
+
+## 7.4 HEX Viewer
+
+采用 Hex Dump 布局：
+
+```text
+Offset    Hexadecimal                 ASCII
+
+00000000  48 65 6C 6C 6F 20 4D 51 54  Hello MQT
+00000009  54 01 02 03                 T...
+```
+
+支持：
+
+- Offset。
+- HEX。
+- ASCII。
+- 复制 HEX。
+- 复制原始字节。
+- 显示总字节数。
+
+## 7.5 JSON Viewer
+
+支持：
+
+- JSON 语法检查。
+- JSON 格式化。
+- JSON 压缩。
+- JSON 树状展示。
+- 节点展开和折叠。
+- 节点复制。
+- 错误定位。
+
+## 7.6 格式转换接口
+
+```rust
+pub trait PayloadCodec {
+    fn decode(
+        &self,
+        data: &[u8],
+    ) -> Result<String, FormatError>;
+
+    fn encode(
+        &self,
+        input: &str,
+    ) -> Result<Vec<u8>, FormatError>;
+}
+```
+
+不同格式实现独立 Codec。
+
+后续可扩展：
+
+- XML。
+- Protobuf。
+- CBOR。
+- Modbus。
+- 自定义二进制协议。
+
+---
+
+# 8. 消息监控
+
+## 8.1 消息列表
+
+每条消息显示：
+
+| 字段 | 说明 |
+|---|---|
+| Time | 接收时间 |
+| Topic | Topic |
+| QoS | QoS |
+| Retain | Retain |
+| Size | 字节数 |
+| Preview | 内容摘要 |
+
+## 8.2 消息详情
+
+显示：
+
+- Topic。
+- 接收时间。
+- QoS。
+- Retain。
+- Payload 长度。
+- MQTT 版本。
+- MQTT 5.0 Properties。
+- 原始 Payload。
+
+## 8.3 消息操作
+
+- 查看详情。
+- 复制 Topic。
+- 复制 Payload。
+- 复制 HEX。
+- 暂停展示。
+- 恢复展示。
+- 清空列表。
+- 发送到发布面板。
+- 切换数据格式。
+
+## 8.4 搜索和过滤
+
+支持：
+
+- Topic 搜索。
+- Payload 搜索。
+- QoS 筛选。
+- Retain 筛选。
+- 时间筛选。
+- 连接筛选。
+
+## 8.5 性能
+
+- 默认内存缓存 10,000 条。
+- 使用虚拟列表。
+- 消息批量更新 UI。
+- 限制大 Payload 预览长度。
+- 消息原始数据和 UI 展示解耦。
+- 消息接收不能阻塞 GUI。
+
+---
+
+# 9. 消息历史
+
+## 9.1 存储
+
+V1.0 优先实现内存缓存。
+
+SQLite 用于保存：
+
+- 连接配置。
+- 订阅配置。
+- 发布模板。
+- 用户设置。
+
+第二阶段增加消息持久化。
+
+## 9.2 导出
+
+支持：
+
+- JSON。
+- CSV。
+- HEX。
+- 原始二进制。
+
+二进制消息导出时必须保留原始数据，不能直接将不可读字符转换为普通文本。
+
+---
+
+# 10. 本地数据模型
+
+## 10.1 Connection
+
+```rust
+struct MqttConnection {
+    id: String,
+    name: String,
+    host: String,
+    port: u16,
+    protocol: MqttVersion,
+    client_id: String,
+    username: Option<String>,
+    keep_alive: u64,
+    auto_reconnect: bool,
+    tls: bool,
+}
+```
+
+密码单独使用系统 Keyring 保存，通过凭据引用关联连接配置。
+
+## 10.2 Subscription
+
+```rust
+struct MqttSubscription {
+    id: String,
+    connection_id: String,
+    topic: String,
+    qos: u8,
+    format: PayloadFormat,
+}
+```
+
+## 10.3 Message
+
+```rust
+struct MqttMessage {
+    id: String,
+    connection_id: String,
+    topic: String,
+    payload: Vec<u8>,
+    qos: u8,
+    retain: bool,
+    received_at: i64,
+    properties: Option<MqttProperties>,
+}
+```
+
+## 10.4 数据库表
+
+```text
+connections
+subscriptions
+publish_templates
+app_settings
+messages
+```
+
+其中 messages 在第一阶段可以不启用持久化。
+
+---
+
+# 11. Rust 项目目录
+
+```text
+mqtt-assistant/
+│
+├── Cargo.toml
+├── Cargo.lock
+│
+├── crates/
+│   ├── mqtt-core/
+│   │   ├── models/
+│   │   ├── format/
+│   │   ├── topic/
+│   │   ├── error.rs
+│   │   └── lib.rs
+│   │
+│   ├── mqtt-engine/
+│   │   ├── connection/
+│   │   ├── subscription/
+│   │   ├── publisher/
+│   │   ├── message/
+│   │   ├── runtime.rs
+│   │   └── lib.rs
+│   │
+│   ├── mqtt-storage/
+│   │   ├── database.rs
+│   │   ├── connection_repo.rs
+│   │   ├── subscription_repo.rs
+│   │   ├── template_repo.rs
+│   │   └── lib.rs
+│   │
+│   ├── mqtt-ui/
+│   │   ├── layout/
+│   │   ├── panels/
+│   │   ├── widgets/
+│   │   ├── theme/
+│   │   ├── dialogs/
+│   │   └── lib.rs
+│   │
+│   └── mqtt-app/
+│       ├── main.rs
+│       ├── app.rs
+│       ├── app_state.rs
+│       ├── command.rs
+│       ├── event.rs
+│       └── lib.rs
+│
+└── tests/
+    ├── mqtt_connection.rs
+    ├── mqtt_publish.rs
+    ├── mqtt_subscribe.rs
+    └── payload_format.rs
+```
+
+模块职责：
+
+- mqtt-core：纯业务模型和格式处理，不依赖 GUI。
+- mqtt-engine：MQTT 通信和异步任务。
+- mqtt-storage：本地数据存储。
+- mqtt-ui：egui 界面。
+- mqtt-app：应用入口和模块协调。
+
+---
+
+# 12. 异步通信设计
+
+## 12.1 Command
+
+GUI 向 MQTT Engine 发送命令：
+
+```rust
+enum MqttCommand {
+    Connect(ConnectionConfig),
+    Disconnect(String),
+    Subscribe(SubscribeRequest),
+    Unsubscribe(UnsubscribeRequest),
+    Publish(PublishRequest),
+}
+```
+
+## 12.2 Event
+
+MQTT Engine 向 GUI 推送事件：
+
+```rust
+enum MqttEvent {
+    ConnectionStatusChanged {
+        connection_id: String,
+        status: ConnectionStatus,
+    },
+    MessageReceived(MqttMessage),
+    PublishCompleted {
+        message_id: String,
+    },
+    Error {
+        connection_id: Option<String>,
+        message: String,
+    },
+}
+```
+
+## 12.3 消息分发
+
+使用 Tokio mpsc 或其他合适的 Channel 实现异步通信。
+
+GUI 在 update() 中：
+
+1. 非阻塞获取消息。
+2. 批量更新消息缓存。
+3. 更新连接状态。
+4. 刷新相关 UI。
+
+高频消息通过批量更新减少重绘开销。
+
+---
+
+# 13. 非功能性需求
+
+## 13.1 性能
+
+初始目标：
+
+- 支持 100 条消息/秒持续接收和展示。
+- 默认缓存 10,000 条消息。
+- 常规 Payload 展示上限 1 MB。
+- 消息处理与 UI 渲染解耦。
+- 不允许网络任务阻塞 UI。
+
+## 13.2 稳定性
+
+- 网络异常不能导致程序崩溃。
+- 自动重连。
+- 正确释放 MQTT 连接。
+- 正确关闭 Tokio Runtime。
+- 处理消息队列积压。
+- 处理大 Payload。
+- 处理非法 UTF-8 和非法 JSON。
+
+## 13.3 安全性
+
+- 密码使用系统 Keyring。
+- 不在日志中记录密码。
+- TLS 证书验证默认开启。
+- 不默认允许无效证书。
+- 敏感配置不明文导出。
+
+## 13.4 跨平台
+
+- macOS。
+- Windows。
+- Linux。
+
+---
+
+# 14. MVP 开发范围
+
+## Phase 1：基础框架
+
+- Rust Workspace。
+- eframe + egui。
+- 主界面三栏布局。
+- 深色和浅色主题。
+- 基础 UI 组件。
+- Tokio Runtime 集成。
+
+## Phase 2：连接管理
+
+- MQTT 连接配置。
+- MQTT 3.1.1。
+- MQTT 5.0。
+- 连接和断开。
+- 自动重连。
+- TLS。
+
+## Phase 3：订阅和消息监控
+
+- Topic 订阅。
+- Topic 取消订阅。
+- QoS。
+- 消息接收。
+- 消息缓存。
+- 消息列表。
+- 消息详情。
+
+## Phase 4：消息发布
+
+- Text 发布。
+- HEX 发布。
+- JSON 发布。
+- QoS。
+- Retain。
+- 发布模板。
+
+## Phase 5：数据格式引擎
+
+- Auto。
+- Text。
+- HEX。
+- JSON。
+- Binary。
+- Base64。
+
+## Phase 6：消息历史和优化
+
+- SQLite。
+- 消息搜索。
+- 消息过滤。
+- 数据导出。
+- 压力测试。
+- 跨平台打包。
+
+---
+
+# 15. 验收标准
+
+| 编号 | 功能 | 验收条件 |
+|---|---|---|
+| AC01 | GUI | 原生 egui 界面正常运行 |
+| AC02 | 连接 | 能连接 MQTT Broker |
+| AC03 | 多连接 | 可以管理多个连接 |
+| AC04 | 自动重连 | 网络恢复后能够重连 |
+| AC05 | 订阅 | 支持普通 Topic |
+| AC06 | 通配符 | 支持 + 和 # |
+| AC07 | 发布 | 可以发布消息 |
+| AC08 | Text | 正确显示文本 |
+| AC09 | HEX | 正确显示原始字节 |
+| AC10 | JSON | 正确解析和格式化 |
+| AC11 | Auto | 能自动识别常见格式 |
+| AC12 | QoS | 支持 0、1、2 |
+| AC13 | Retain | 支持保留消息 |
+| AC14 | 消息列表 | 实时更新 |
+| AC15 | 消息详情 | 能查看完整 Payload |
+| AC16 | 搜索 | 支持 Topic 搜索 |
+| AC17 | 性能 | 完成 100 条/秒测试 |
+| AC18 | 跨平台 | 三个平台可运行 |
+
+---
+
+# 16. 后续扩展
+
+## 16.1 数据 Dashboard
+
+支持从 MQTT 消息中提取数值并展示：
+
+- 温度曲线。
+- 湿度曲线。
+- 电压曲线。
+- 设备状态。
+- 在线设备数量。
+
+可以基于 egui 绘制图表。
+
+## 16.2 自动化测试
+
+- 定时发布。
+- 批量发布。
+- 多 Topic 订阅。
+- 消息响应验证。
+- 自动化测试用例。
+- 测试结果统计。
+
+## 16.3 自定义协议解析
+
+支持用户定义二进制协议解析规则。
+
+例如：
+
+```text
+Offset 0: Device ID      2 Bytes
+Offset 2: Temperature    2 Bytes
+Offset 4: Humidity       2 Bytes
+Offset 6: Status         1 Byte
+```
+
+将解析结果转换为结构化数据。
+
+## 16.4 CLI
+
+未来增加 mqtt-assistant-cli：
+
+- 连接 Broker。
+- 订阅 Topic。
+- 发布消息。
+- 导出数据。
+- 自动化测试。
+
+CLI 和 GUI 共用 mqtt-core、mqtt-engine。
+
+---
+
+# 17. 最终产品目标
+
+MQTT Assistant V1.0 是一款纯 Rust 原生桌面 MQTT 调试工具。
+
+采用 egui + eframe 构建现代化 UI，使用 rumqttc + Tokio 实现异步 MQTT 通信。
+
+核心目标：
+
+1. 连接管理可靠。
+2. 订阅管理方便。
+3. 消息发布灵活。
+4. 数据展示直观。
+5. 二进制数据处理准确。
+6. 大量消息下 UI 保持流畅。
+7. 具备良好的模块化和扩展能力。
+
+**核心设计原则：纯 Rust、原生 GUI、业务与界面解耦、异步消息处理。**
+
