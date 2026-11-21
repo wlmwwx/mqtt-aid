@@ -6,9 +6,9 @@ use std::time::Instant;
 
 use mqtt_core::models::{
     ConnectionStatus, MqttConnection, MqttMessage, MqttSubscription, PayloadFormat, PublishRequest,
-    PublishTemplate,
+    PublishTemplate, SubscribeRequest,
 };
-use mqtt_engine::{MqttEngine, MqttEvent};
+use mqtt_engine::{MqttCommand, MqttEngine, MqttEvent};
 use mqtt_storage::{ConnectionRepo, Database, SettingsRepo, SubscriptionRepo, TemplateRepo};
 use mqtt_ui::{ConnectionView, ExportFormat, UiState};
 
@@ -181,7 +181,14 @@ impl AppState {
                     connection_id,
                     status,
                 } => {
-                    self.statuses.insert(connection_id, status);
+                    let connected = status == ConnectionStatus::Connected;
+                    self.statuses.insert(connection_id.clone(), status);
+                    if connected {
+                        // The broker forgets the subscriptions when the
+                        // session ends, so a connection that comes back has
+                        // to ask for them again.
+                        self.restore_subscriptions(&connection_id);
+                    }
                 }
                 MqttEvent::MessageReceived(message) => {
                     if !self.paused {
@@ -220,6 +227,34 @@ impl AppState {
         self.ui.stats.published = self.published;
         self.ui.stats.messages_per_second = self.rate;
         self.ui.stats.cached = self.messages.len();
+    }
+
+    /// Subscribe again to everything a connection is subscribed to.
+    ///
+    /// A broker drops the subscriptions of a session when the session ends,
+    /// so a connection that was disconnected and connected again — or that was
+    /// opened after the application was restarted — receives nothing until it
+    /// subscribes again. The subscriptions of the application are the truth
+    /// here: they are persisted, and a subscription the user deleted is
+    /// really gone.
+    fn restore_subscriptions(&mut self, connection_id: &str) {
+        let requests: Vec<SubscribeRequest> = self
+            .subscriptions
+            .iter()
+            .filter(|subscription| subscription.connection_id == connection_id)
+            .map(|subscription| SubscribeRequest {
+                connection_id: connection_id.to_string(),
+                id: subscription.id.clone(),
+                topic: subscription.topic.clone(),
+                qos: subscription.qos,
+            })
+            .collect();
+
+        for request in requests {
+            if let Err(error) = self.engine.execute(MqttCommand::Subscribe(request)) {
+                tracing::warn!("could not subscribe again: {error}");
+            }
+        }
     }
 
     /// Persist a connection.

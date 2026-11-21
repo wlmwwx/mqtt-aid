@@ -6,7 +6,9 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use mqtt_app::AppState;
-use mqtt_core::models::{MqttConnection, MqttSubscription, MqttVersion};
+use mqtt_core::models::{
+    ConnectionStatus, MqttConnection, MqttSubscription, MqttVersion, SubscribeRequest,
+};
 use mqtt_engine::{MqttCommand, MqttEngine};
 use mqtt_ui::ExportFormat;
 
@@ -152,6 +154,114 @@ fn captures_messages_from_a_broker() {
 
     publisher.shutdown();
     panic!("the message never arrived");
+}
+
+/// Wait until the application reports the given status for a connection.
+fn wait_for_status(state: &mut AppState, connection_id: &str, status: ConnectionStatus) {
+    let deadline = Instant::now() + Duration::from_secs(15);
+    while Instant::now() < deadline {
+        state.pump_events();
+        if state.statuses.get(connection_id) == Some(&status) {
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    panic!("the connection {connection_id} never reached {status:?}");
+}
+
+/// Publish until the application receives the message.
+///
+/// The publish is repeated, because the subscription and the first publish
+/// can reach the broker in either order.
+fn publish_until_received(state: &mut AppState, publisher: &MqttEngine, topic: &str) {
+    let deadline = Instant::now() + Duration::from_secs(15);
+    while Instant::now() < deadline {
+        publish(publisher, topic);
+        for _ in 0..10 {
+            state.pump_events();
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        if state.messages.iter().any(|message| message.topic == topic) {
+            return;
+        }
+    }
+    panic!("no message arrived on {topic}");
+}
+
+/// Publish a message with another client.
+fn publish(publisher: &MqttEngine, topic: &str) {
+    publisher
+        .execute(MqttCommand::Publish(mqtt_core::models::PublishRequest {
+            connection_id: "pub".to_string(),
+            topic: topic.to_string(),
+            payload: b"{\"value\":42}".to_vec(),
+            qos: 1,
+            retain: false,
+            properties: None,
+        }))
+        .expect("the engine accepts the command");
+}
+
+/// A connection that is disconnected and connected again has to subscribe
+/// again: the broker forgets the subscriptions of a session that ended.
+#[test]
+fn a_reconnected_connection_subscribes_again() {
+    let port = start_broker();
+    let mut state = AppState::open_in(temporary_config("reconnect"));
+
+    let mut connection = MqttConnection::new("local", "Local", "127.0.0.1", port);
+    connection.protocol = MqttVersion::V311;
+    connection.client_id = "app-test-reconnect".to_string();
+    connection.auto_reconnect = false;
+    state.save_connection(connection.clone());
+    state.save_subscription(MqttSubscription::new("sub-1", "local", "app/#", 1));
+
+    // A second client publishes into the topic the application listens to.
+    let publisher = MqttEngine::new();
+    let mut publisher_connection = MqttConnection::new("pub", "Publisher", "127.0.0.1", port);
+    publisher_connection.client_id = "app-test-reconnect-pub".to_string();
+    publisher_connection.auto_reconnect = false;
+    publisher
+        .execute(MqttCommand::Connect(publisher_connection))
+        .expect("the engine accepts the command");
+
+    state
+        .engine
+        .execute(MqttCommand::Connect(connection.clone()))
+        .expect("the engine accepts the command");
+    wait_for_status(&mut state, "local", ConnectionStatus::Connected);
+
+    // The user subscribes to a topic.
+    state
+        .engine
+        .execute(MqttCommand::Subscribe(SubscribeRequest {
+            connection_id: "local".to_string(),
+            id: "sub-1".to_string(),
+            topic: "app/#".to_string(),
+            qos: 1,
+        }))
+        .expect("the engine accepts the command");
+
+    publish_until_received(&mut state, &publisher, "app/first");
+
+    // The user disconnects and connects again.
+    state
+        .engine
+        .execute(MqttCommand::Disconnect("local".to_string()))
+        .expect("the engine accepts the command");
+    wait_for_status(&mut state, "local", ConnectionStatus::Disconnected);
+
+    state
+        .engine
+        .execute(MqttCommand::Connect(connection.clone()))
+        .expect("the engine accepts the command");
+    wait_for_status(&mut state, "local", ConnectionStatus::Connected);
+
+    // The subscription has to be there again, without the user doing
+    // anything.
+    publish_until_received(&mut state, &publisher, "app/second");
+
+    publisher.shutdown();
 }
 
 #[test]

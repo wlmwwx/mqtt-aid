@@ -174,6 +174,7 @@ HEX 编解码：接受空格分隔与无空格混合输入，奇数长度或非�
 - **每个连接一个独立任务**，任务内持有该连接的 `AsyncClient` + `EventLoop`，用 `tokio::select!` 在「接收连接级命令」与「轮询网络事件」之间选择。
 - 连接级命令：`Subscribe` / `Unsubscribe` / `Publish` / `Disconnect` / `SetSubscriptionQos`。
 - **自动重连**：事件循环返回错误且连接配置开启 `auto_reconnect` 时，状态置为 `Reconnecting`，以指数退避（1s 起，上限 30s）重建事件循环；重建期间连接级命令继续排队不丢。
+- **重连后重新订阅**：Broker 在会话结束时丢弃该会话的订阅，所以连接一旦重新连上（手动断开再连、自动重连、或者应用重启后重新连接），应用必须再订阅一次。订阅列表以应用持久化的数据为准（`mqtt-app` 在收到 `Connected` 状态时按存储的订阅重新下发 `Subscribe`），这样被用户删掉的订阅不会复活，而重启前的订阅会自动恢复。
 - 状态传播：连接任务直接更新共享的状态表并发出 `MqttEvent::ConnectionStatusChanged`。
 - 订阅确认：`SubscriptionAcknowledged` 在收到 Broker 的 **SUBACK** 时才发出，而不是在请求入队时——这样它可以作为「订阅已生效」的可靠屏障。
 - GUI 侧非阻塞消费：`try_recv` 循环 + 每帧最多消费的条数上限，避免单帧卡死。
