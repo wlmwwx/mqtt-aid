@@ -24,6 +24,8 @@ canvas.
   the publish panel on the right, the status bar at the bottom, the message
   monitor in the middle. Each panel has a header with a drag grip, an overflow
   menu and a collapse arrow.
+- **Two pages in the middle** — `消息` shows the captured messages, `数据` shows
+  the charts of the data series.
 
 The menu bar and the ribbon speak one vocabulary: every entry produces the same
 command, so a command added to one is available in the other.
@@ -44,6 +46,10 @@ command, so a command added to one is available in the other.
   raw bytes it arrived as; every format is only a view of it.
 - **Publishing** — Text, HEX, JSON, Base64 and Binary payloads with live validation
   and a byte count, QoS 0/1/2, retain, MQTT 5.0 properties and reusable templates.
+- **Data series and charts** — watch one field of the messages of a topic over
+  time. The field is a path into the JSON payload (`data.temperature`, arrays as
+  `sensors[0].value`), or the whole payload when it is a plain number. Several
+  series share one time-series chart, and the series survive a restart.
 - **Search and filtering** — by topic, by payload content, by QoS, by retain flag
   and by connection.
 - **Export** — captured messages as JSON, CSV, HEX or raw bytes; the binary export
@@ -101,7 +107,7 @@ publish, assert on the events that come back.
 crates/mqtt-core   unit tests for the format engine and the topic rules
 crates/mqtt-engine integration tests against a live broker
 crates/mqtt-storage round trips through SQLite
-crates/mqtt-ui     headless UI tests: the menus, the ribbon and the message panel
+crates/mqtt-ui     headless UI tests: the menus, the ribbon, the message and data panels
 crates/mqtt-app    end to end: state, engine and storage together
 ```
 

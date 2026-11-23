@@ -5,17 +5,21 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use mqtt_core::models::{
-    ConnectionStatus, MqttConnection, MqttMessage, MqttSubscription, PayloadFormat, PublishRequest,
-    PublishTemplate, SubscribeRequest,
+    ConnectionStatus, DataPoint, DataSeries, MqttConnection, MqttMessage, MqttSubscription,
+    PayloadFormat, PublishRequest, PublishTemplate, SubscribeRequest,
 };
 use mqtt_engine::{MqttCommand, MqttEngine, MqttEvent};
-use mqtt_storage::{ConnectionRepo, Database, SettingsRepo, SubscriptionRepo, TemplateRepo};
+use mqtt_storage::{
+    ConnectionRepo, DataSeriesRepo, Database, SettingsRepo, SubscriptionRepo, TemplateRepo,
+};
 use mqtt_ui::{ConnectionView, ExportFormat, UiState};
 
 /// How many messages are kept in memory.
 pub const DEFAULT_CACHE_LIMIT: usize = 10_000;
 /// How many events are drained from the engine per frame.
 pub const EVENTS_PER_FRAME: usize = 512;
+/// How many samples a data series keeps.
+pub const SAMPLE_LIMIT: usize = 2_000;
 
 /// The application state.
 pub struct AppState {
@@ -26,6 +30,10 @@ pub struct AppState {
     pub statuses: HashMap<String, ConnectionStatus>,
     pub messages: VecDeque<MqttMessage>,
     pub templates: Vec<PublishTemplate>,
+    /// The data series the user watches.
+    pub series: Vec<DataSeries>,
+    /// The samples of every series, by series id.
+    pub samples: HashMap<String, VecDeque<DataPoint>>,
     pub ui: UiState,
     pub paused: bool,
     pub received: u64,
@@ -59,6 +67,8 @@ impl AppState {
             statuses: HashMap::new(),
             messages: VecDeque::new(),
             templates: Vec::new(),
+            series: Vec::new(),
+            samples: HashMap::new(),
             ui: UiState::default(),
             paused: false,
             received: 0,
@@ -89,6 +99,10 @@ impl AppState {
         match TemplateRepo::new(storage).list() {
             Ok(templates) => self.templates = templates,
             Err(error) => tracing::warn!("could not load the templates: {error}"),
+        }
+        match DataSeriesRepo::new(storage).list() {
+            Ok(series) => self.series = series,
+            Err(error) => tracing::warn!("could not load the data series: {error}"),
         }
         if let Ok(Some(limit)) = SettingsRepo::new(storage).get("cache_limit")
             && let Ok(limit) = limit.parse::<usize>()
@@ -191,6 +205,10 @@ impl AppState {
                     }
                 }
                 MqttEvent::MessageReceived(message) => {
+                    // The data series are read even while the display is
+                    // paused: pausing hides the messages, it does not stop
+                    // the charts.
+                    self.collect(&message);
                     if !self.paused {
                         self.received += 1;
                         self.rate_count += 1;
@@ -257,6 +275,111 @@ impl AppState {
         }
     }
 
+    /// Read the value of every series out of a message.
+    ///
+    /// A series only reads the messages of the connection and the topics it
+    /// watches, and only the ones that hold the value it is after.
+    fn collect(&mut self, message: &MqttMessage) {
+        let watching: Vec<(String, String)> = self
+            .series
+            .iter()
+            .filter(|series| {
+                series.connection_id == message.connection_id
+                    && mqtt_core::topic::matches(&series.topic, &message.topic)
+            })
+            .map(|series| (series.id.clone(), series.path.clone()))
+            .collect();
+
+        for (id, path) in watching {
+            let Some(value) = mqtt_core::extract::extract_value(&message.payload, &path) else {
+                continue;
+            };
+            let points = self.samples.entry(id).or_default();
+            points.push_back(DataPoint {
+                at: message.received_at,
+                value,
+            });
+            while points.len() > SAMPLE_LIMIT {
+                points.pop_front();
+            }
+        }
+    }
+
+    /// Watch a new data series.
+    ///
+    /// The messages of the topic have to reach the application, so the
+    /// topic is subscribed when no subscription covers it yet.
+    pub fn add_series(&mut self, series: DataSeries) {
+        match self.series.iter_mut().find(|entry| entry.id == series.id) {
+            Some(existing) => *existing = series.clone(),
+            None => self.series.push(series.clone()),
+        }
+        self.persist_series(&series);
+        self.subscribe_topic(&series);
+    }
+
+    /// Make sure the messages of the topic of a series arrive.
+    ///
+    /// A subscription that already covers the topic is left alone: two
+    /// subscriptions of the same topic would deliver every message twice.
+    fn subscribe_topic(&mut self, series: &DataSeries) {
+        let topic = series.topic.trim();
+        if topic.is_empty() || series.connection_id.is_empty() {
+            return;
+        }
+
+        let covered = self.subscriptions.iter().any(|subscription| {
+            subscription.connection_id == series.connection_id
+                && mqtt_core::topic::matches(&subscription.topic, topic)
+        });
+        if covered {
+            return;
+        }
+
+        let id = mqtt_ui::panels::left_panel::new_id();
+        let subscription = MqttSubscription::new(
+            id.clone(),
+            series.connection_id.clone(),
+            topic.to_string(),
+            0,
+        );
+        self.save_subscription(subscription);
+
+        let _ = self
+            .engine
+            .execute(MqttCommand::Subscribe(SubscribeRequest {
+                connection_id: series.connection_id.clone(),
+                id,
+                topic: topic.to_string(),
+                qos: 0,
+            }));
+    }
+
+    /// Change a data series.
+    pub fn update_series(&mut self, series: DataSeries) {
+        self.add_series(series);
+    }
+
+    /// Stop watching a data series.
+    pub fn remove_series(&mut self, id: &str) {
+        self.series.retain(|series| series.id != id);
+        self.samples.remove(id);
+        if let Some(storage) = &self.storage
+            && let Err(error) = DataSeriesRepo::new(storage).delete(id)
+        {
+            tracing::warn!("could not delete the data series: {error}");
+        }
+    }
+
+    /// Store a data series.
+    fn persist_series(&self, series: &DataSeries) {
+        if let Some(storage) = &self.storage
+            && let Err(error) = DataSeriesRepo::new(storage).save(series)
+        {
+            tracing::warn!("could not save the data series: {error}");
+        }
+    }
+
     /// Persist a connection.
     pub fn save_connection(&mut self, connection: MqttConnection) {
         match self.connections.iter_mut().find(|c| c.id == connection.id) {
@@ -306,6 +429,16 @@ impl AppState {
         self.connections.retain(|connection| connection.id != id);
         self.subscriptions
             .retain(|subscription| subscription.connection_id != id);
+        // The data series of the connection go with it.
+        let gone: Vec<String> = self
+            .series
+            .iter()
+            .filter(|series| series.connection_id == id)
+            .map(|series| series.id.clone())
+            .collect();
+        for series_id in gone {
+            self.remove_series(&series_id);
+        }
         self.statuses.remove(id);
         if let Some(storage) = &self.storage {
             let repo = ConnectionRepo::new(storage);

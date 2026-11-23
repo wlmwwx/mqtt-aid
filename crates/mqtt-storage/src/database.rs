@@ -118,6 +118,15 @@ impl Database {
                 data TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS data_series (
+                id            TEXT PRIMARY KEY,
+                name          TEXT NOT NULL,
+                connection_id TEXT NOT NULL,
+                topic         TEXT NOT NULL,
+                path          TEXT NOT NULL,
+                data          TEXT NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS app_settings (
                 key   TEXT PRIMARY KEY,
                 value TEXT NOT NULL

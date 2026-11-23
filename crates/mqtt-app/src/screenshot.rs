@@ -6,6 +6,9 @@
 //!
 //! `MQTT_ASSISTANT_OPEN_MENU` opens one of the menu bar menus before the
 //! picture is taken, so that the dropdowns can be checked as well.
+//!
+//! `MQTT_ASSISTANT_CENTER_TAB` picks the tab of the centre panel (`message`
+//! or `data`).
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -95,6 +98,11 @@ impl Default for Screenshot {
 /// The menu that should be open in the picture, if any.
 pub fn open_menu() -> Option<String> {
     std::env::var("MQTT_ASSISTANT_OPEN_MENU").ok()
+}
+
+/// The tab of the centre panel that should be shown in the picture, if any.
+pub fn center_tab() -> Option<String> {
+    std::env::var("MQTT_ASSISTANT_CENTER_TAB").ok()
 }
 
 /// Write an egui colour image as a PNG file.

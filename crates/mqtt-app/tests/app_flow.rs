@@ -6,8 +6,11 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use mqtt_app::AppState;
+use std::collections::VecDeque;
+
 use mqtt_core::models::{
-    ConnectionStatus, MqttConnection, MqttSubscription, MqttVersion, SubscribeRequest,
+    ConnectionStatus, DataPoint, DataSeries, MqttConnection, MqttSubscription, MqttVersion,
+    SubscribeRequest,
 };
 use mqtt_engine::{MqttCommand, MqttEngine};
 use mqtt_ui::ExportFormat;
@@ -188,6 +191,20 @@ fn publish_until_received(state: &mut AppState, publisher: &MqttEngine, topic: &
     panic!("no message arrived on {topic}");
 }
 
+/// Publish a raw payload with another client.
+fn publish_raw(publisher: &MqttEngine, topic: &str, payload: &[u8]) {
+    publisher
+        .execute(MqttCommand::Publish(mqtt_core::models::PublishRequest {
+            connection_id: "pub".to_string(),
+            topic: topic.to_string(),
+            payload: payload.to_vec(),
+            qos: 1,
+            retain: false,
+            properties: None,
+        }))
+        .expect("the engine accepts the command");
+}
+
 /// Publish a message with another client.
 fn publish(publisher: &MqttEngine, topic: &str) {
     publisher
@@ -316,6 +333,158 @@ fn filters_messages_by_topic_and_qos() {
     let visible = state.visible_messages();
     assert_eq!(visible.len(), 1);
     assert_eq!(visible[0].topic, "sensor/1");
+}
+
+/// A data series reads a field out of the messages of a topic and keeps the
+/// values as a chart.
+#[test]
+fn collects_the_values_of_a_data_series() {
+    let port = start_broker();
+    let mut state = AppState::open_in(temporary_config("series"));
+
+    let mut connection = MqttConnection::new("local", "Local", "127.0.0.1", port);
+    connection.protocol = MqttVersion::V311;
+    connection.client_id = "app-test-series".to_string();
+    connection.auto_reconnect = false;
+    state.save_connection(connection.clone());
+    state.add_series(DataSeries::new(
+        "series-1",
+        "温度",
+        "local",
+        "sensors/room",
+        "data.temperature",
+    ));
+
+    let publisher = MqttEngine::new();
+    let mut publisher_connection = MqttConnection::new("pub", "Publisher", "127.0.0.1", port);
+    publisher_connection.client_id = "app-test-series-pub".to_string();
+    publisher_connection.auto_reconnect = false;
+    publisher
+        .execute(MqttCommand::Connect(publisher_connection))
+        .expect("the engine accepts the command");
+
+    state
+        .engine
+        .execute(MqttCommand::Connect(connection.clone()))
+        .expect("the engine accepts the command");
+    wait_for_status(&mut state, "local", ConnectionStatus::Connected);
+
+    // The first publishes can be lost: the broker may not have registered
+    // the subscription yet. So the messages keep coming, with a value that
+    // grows every time.
+    let deadline = Instant::now() + Duration::from_secs(15);
+    let mut step = 0u32;
+    while Instant::now() < deadline {
+        let value = 21.0 + f64::from(step) / 10.0;
+        publish_raw(
+            &publisher,
+            "sensors/room",
+            format!("{{\"data\": {{\"temperature\": {value}}}}}").as_bytes(),
+        );
+        step += 1;
+
+        // A message of another topic is not part of the series, and a
+        // message without the field is skipped.
+        if step == 3 {
+            publish_raw(
+                &publisher,
+                "sensors/hall",
+                br#"{"data": {"temperature": 99.0}}"#,
+            );
+            publish_raw(&publisher, "sensors/room", br#"{"data": {"humidity": 40}}"#);
+        }
+
+        for _ in 0..5 {
+            state.pump_events();
+            std::thread::sleep(Duration::from_millis(20));
+        }
+
+        let count = state
+            .samples
+            .get("series-1")
+            .map_or(0, |points| points.len());
+        if count >= 2 {
+            break;
+        }
+    }
+
+    let samples = state
+        .samples
+        .get("series-1")
+        .expect("the series has samples");
+    let values: Vec<f64> = samples.iter().map(|point| point.value).collect();
+    assert!(values.len() >= 2, "too few values: {values:?}");
+    // Every value belongs to this topic and this field, and they arrive in
+    // the order the messages were sent.
+    assert!(
+        values.windows(2).all(|pair| pair[0] < pair[1]),
+        "the values are not in order: {values:?}"
+    );
+    assert!(
+        values.iter().all(|value| (21.0..22.0).contains(value)),
+        "a value of another topic or field showed up: {values:?}"
+    );
+
+    publisher.shutdown();
+}
+
+/// A data series survives a restart of the application.
+#[test]
+fn persists_the_data_series() {
+    let directory = temporary_config("series-persist");
+    let mut state = AppState::open_in(directory.clone());
+    state.add_series(DataSeries::new(
+        "series-p",
+        "湿度",
+        "local",
+        "sensors/room",
+        "humidity",
+    ));
+
+    let reloaded = AppState::open_in(directory);
+    assert_eq!(reloaded.series.len(), 1);
+    assert_eq!(reloaded.series[0].name, "湿度");
+    assert_eq!(reloaded.series[0].topic, "sensors/room");
+    assert_eq!(reloaded.series[0].path, "humidity");
+}
+
+/// Deleting a connection takes its data series with it.
+#[test]
+fn forgets_the_series_of_a_deleted_connection() {
+    let mut state = AppState::open_in(temporary_config("series-connection"));
+    state.add_series(DataSeries::new(
+        "series-c",
+        "温度",
+        "local",
+        "sensors/room",
+        "temperature",
+    ));
+
+    state.delete_connection("local");
+
+    assert!(state.series.is_empty());
+}
+
+/// Removing a series takes its samples with it.
+#[test]
+fn forgets_the_samples_of_a_removed_series() {
+    let mut state = AppState::open_in(temporary_config("series-remove"));
+    state.add_series(DataSeries::new(
+        "series-r",
+        "温度",
+        "local",
+        "sensors/room",
+        "temperature",
+    ));
+    state.samples.insert(
+        "series-r".to_string(),
+        VecDeque::from([DataPoint { at: 0, value: 1.0 }]),
+    );
+
+    state.remove_series("series-r");
+
+    assert!(state.series.is_empty());
+    assert!(!state.samples.contains_key("series-r"));
 }
 
 #[test]

@@ -24,6 +24,9 @@ pub fn json_view(ui: &mut Ui, value: &serde_json::Value) {
     // "Double use of ScrollArea ID" error over the window.
     egui::ScrollArea::vertical()
         .id_salt("json_payload")
+        // The tree fills the width of the panel, so that its scroll bar sits
+        // at the edge of the panel.
+        .auto_shrink([false, true])
         .max_height(spacing::JSON_VIEW_HEIGHT)
         .show(ui, |ui| {
             json_node(ui, value, 0);

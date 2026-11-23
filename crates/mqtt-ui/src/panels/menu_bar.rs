@@ -12,7 +12,7 @@ use egui::{Response, RichText, Ui};
 
 use mqtt_core::models::PayloadFormat;
 
-use crate::state::{AppCommand, ExportFormat, UiActions, UiState};
+use crate::state::{AppCommand, CenterTab, ExportFormat, UiActions, UiState};
 
 /// One entry of a menu: its caption and the button that draws it.
 pub struct Entry {
@@ -159,10 +159,32 @@ pub fn view_menu(ui: &mut Ui, state: &mut UiState, actions: &mut UiActions) -> V
     ui.separator();
 
     entries.push(Entry {
+        label: "消息面板",
+        response: ui.button("消息面板"),
+    });
+    if entries[0].response.clicked() {
+        actions
+            .commands
+            .push(AppCommand::SetCenterTab(CenterTab::Message));
+    }
+
+    entries.push(Entry {
+        label: "数据面板",
+        response: ui.button("数据面板"),
+    });
+    if entries[1].response.clicked() {
+        actions
+            .commands
+            .push(AppCommand::SetCenterTab(CenterTab::Data));
+    }
+
+    ui.separator();
+
+    entries.push(Entry {
         label: "深色主题",
         response: ui.button("深色主题"),
     });
-    if entries[0].response.clicked() {
+    if entries[2].response.clicked() {
         actions.commands.push(AppCommand::ToggleTheme);
     }
 
@@ -170,7 +192,7 @@ pub fn view_menu(ui: &mut Ui, state: &mut UiState, actions: &mut UiActions) -> V
         label: "浅色主题",
         response: ui.button("浅色主题"),
     });
-    if entries[1].response.clicked() {
+    if entries[3].response.clicked() {
         actions.commands.push(AppCommand::ToggleTheme);
     }
 

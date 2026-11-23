@@ -3,6 +3,7 @@
 pub mod icons;
 pub mod panel_header;
 pub mod payload_views;
+pub mod tabs;
 
 use egui::{Color32, RichText, Ui};
 use mqtt_core::models::{MqttMessage, PayloadFormat};
@@ -41,6 +42,10 @@ pub fn message_table(
     let table_height = (ui.available_height() - spacing::DETAILS_HEIGHT).max(60.0);
     egui::ScrollArea::vertical()
         .id_salt("message_table")
+        // The table fills the width of the panel: a scroll area that shrinks
+        // to its content would put its scroll bar in the middle of the
+        // panel instead of at its edge.
+        .auto_shrink([false, true])
         .max_height(table_height)
         .show_rows(ui, row_height, messages.len(), |ui, range| {
             for index in range {

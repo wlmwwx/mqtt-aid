@@ -189,6 +189,49 @@ impl MqttSubscription {
     }
 }
 
+/// A data series: one number taken out of every message of a topic.
+///
+/// The path names the field to read. An empty path reads the whole payload,
+/// which only works when the payload is a number by itself.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DataSeries {
+    pub id: String,
+    /// The name shown in the legend.
+    pub name: String,
+    /// The connection the messages come from.
+    pub connection_id: String,
+    /// The topic the messages come from. It may hold wildcards.
+    pub topic: String,
+    /// The field path inside the payload, for example `data.temperature`.
+    pub path: String,
+}
+
+impl DataSeries {
+    pub fn new(
+        id: impl Into<String>,
+        name: impl Into<String>,
+        connection_id: impl Into<String>,
+        topic: impl Into<String>,
+        path: impl Into<String>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            name: name.into(),
+            connection_id: connection_id.into(),
+            topic: topic.into(),
+            path: path.into(),
+        }
+    }
+}
+
+/// One value of a data series, with the moment it was received.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct DataPoint {
+    /// Unix epoch milliseconds.
+    pub at: i64,
+    pub value: f64,
+}
+
 /// MQTT 5.0 publish properties, in a form that does not depend on the wire
 /// library.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]

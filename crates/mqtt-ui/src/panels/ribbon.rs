@@ -7,7 +7,7 @@
 
 use egui::{Align, Layout, Rect, RichText, Stroke, Ui};
 
-use crate::state::{AppCommand, ExportFormat, RibbonTab, UiActions, UiState};
+use crate::state::{AppCommand, CenterTab, ExportFormat, RibbonTab, UiActions, UiState};
 use crate::theme::spacing;
 use crate::widgets::icons::{self, Icon};
 
@@ -112,6 +112,18 @@ pub fn commands_for(tab: RibbonTab) -> Vec<Command> {
             command("保存模板", Icon::Copy, "模板", AppCommand::SaveTemplate),
         ],
         RibbonTab::View => vec![
+            command(
+                "数据面板",
+                Icon::Chart,
+                "面板",
+                AppCommand::SetCenterTab(CenterTab::Data),
+            ),
+            command(
+                "消息面板",
+                Icon::Layers,
+                "面板",
+                AppCommand::SetCenterTab(CenterTab::Message),
+            ),
             command("左栏", Icon::Layers, "面板", AppCommand::ToggleLeftPanel),
             command("右栏", Icon::Layers, "面板", AppCommand::ToggleRightPanel),
             command("状态栏", Icon::Layers, "面板", AppCommand::ToggleStatusBar),
@@ -370,28 +382,12 @@ fn tab_strip(ui: &mut Ui, state: &mut UiState) {
                     };
 
                     // The selected tab gets a blue plate, the way SolidCraft
-                    // marks the active category. The plate is a frame, so it
-                    // is painted under the caption.
-                    let frame = if active {
-                        egui::Frame::new()
-                            .fill(palette.tab_active)
-                            .corner_radius(spacing::CORNER_SMALL)
-                            .inner_margin(egui::Margin::symmetric(10, 4))
-                    } else {
-                        egui::Frame::new()
-                            .fill(egui::Color32::TRANSPARENT)
-                            .inner_margin(egui::Margin::symmetric(10, 4))
-                    };
-                    frame.show(ui, |ui| {
-                        let response = ui.add(
-                            egui::Button::new(text)
-                                .fill(egui::Color32::TRANSPARENT)
-                                .stroke(egui::Stroke::NONE),
-                        );
-                        if response.clicked() {
-                            state.ribbon_tab = *tab;
-                        }
-                    });
+                    // marks the active category.
+                    let response =
+                        crate::widgets::tabs::tab_button(ui, text, active, palette.tab_active);
+                    if response.clicked() {
+                        state.ribbon_tab = *tab;
+                    }
                 }
 
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {

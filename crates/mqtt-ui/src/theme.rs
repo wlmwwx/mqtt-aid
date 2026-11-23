@@ -97,9 +97,11 @@ impl Theme {
         visuals.widgets.noninteractive.bg_fill = palette.surface;
         visuals.widgets.noninteractive.weak_bg_fill = palette.surface;
         visuals.widgets.noninteractive.fg_stroke = Stroke::new(1.0, palette.text_faint);
+        // The stroke of an inactive widget: the arrow of a drop-down and
+        // the handle of a scroll bar are drawn with it.
         visuals.widgets.inactive.bg_fill = palette.surface;
         visuals.widgets.inactive.weak_bg_fill = palette.surface;
-        visuals.widgets.inactive.fg_stroke = Stroke::new(1.0, palette.border);
+        visuals.widgets.inactive.fg_stroke = Stroke::new(1.0, palette.text_dim);
         visuals.widgets.hovered.bg_fill = palette.border;
         visuals.widgets.hovered.weak_bg_fill = palette.border;
         visuals.widgets.hovered.fg_stroke = Stroke::new(1.0, palette.accent_text);
@@ -109,7 +111,24 @@ impl Theme {
         // also the colour of every bold label.
         visuals.widgets.active.fg_stroke = Stroke::new(1.0, palette.text);
         visuals.widgets.open.bg_fill = palette.surface;
+
         visuals
+    }
+
+    /// The style of the scroll bars.
+    ///
+    /// The scroll bars float above the content, so they do not take any room
+    /// away from it. The handle stays faintly visible when the mouse is
+    /// elsewhere: a scroll bar that only shows up while it is dragged is a
+    /// scroll bar nobody notices.
+    pub fn scroll_style() -> egui::style::ScrollStyle {
+        let mut scroll = egui::style::ScrollStyle::floating();
+        scroll.bar_width = 10.0;
+        scroll.floating_width = 4.0;
+        scroll.dormant_handle_opacity = 0.30;
+        scroll.active_handle_opacity = 0.55;
+        scroll.interact_handle_opacity = 0.95;
+        scroll
     }
 }
 

@@ -7,7 +7,7 @@
 /// Every command the UI is able to emit.
 fn all_commands() -> Vec<mqtt_ui::state::AppCommand> {
     use mqtt_core::models::PayloadFormat;
-    use mqtt_ui::state::{AppCommand, ExportFormat};
+    use mqtt_ui::state::{AppCommand, CenterTab, ExportFormat};
 
     vec![
         AppCommand::NewConnection,
@@ -37,6 +37,8 @@ fn all_commands() -> Vec<mqtt_ui::state::AppCommand> {
         AppCommand::ToggleLeftPanel,
         AppCommand::ToggleRightPanel,
         AppCommand::ToggleStatusBar,
+        AppCommand::SetCenterTab(CenterTab::Message),
+        AppCommand::SetCenterTab(CenterTab::Data),
         AppCommand::FocusSearch,
         AppCommand::About,
         AppCommand::Shortcuts,

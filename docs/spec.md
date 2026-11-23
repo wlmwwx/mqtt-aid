@@ -110,21 +110,31 @@ MQTT 开发者与硬件联调人员目前只能依赖 `mosquitto_sub` / `mosquit
 73. As a MQTT 调试工程师, I want a format codec interface that new formats can plug into, so that XML or CBOR support is additive.
 74. As a MQTT 调试工程师, I want invalid UTF-8 bytes to be shown as HEX rather than mangled, so that the data I see is the data that was sent.
 
+### 数据序列与图表
+
+75. As a MQTT 调试工程师, I want to watch one field of the messages of a topic over time, so that I see the trend without reading the messages one by one.
+76. As a MQTT 调试工程师, I want to pick the field with a path like `data.temperature`, so that I can read a value out of a nested JSON document.
+77. As a MQTT 调试工程师, I want to watch a topic whose payload is a plain number, so that I can plot simple sensors too.
+78. As a MQTT 调试工程师, I want several series on one chart, so that I can compare two values of the same device.
+79. As a MQTT 调试工程师, I want the series to survive a restart, so that my dashboard is still there tomorrow.
+80. As a MQTT 调试工程师, I want the values to keep coming while the message list is paused, so that pausing the table does not stop the charts.
+81. As a MQTT 调试工程师, I want the chart to ignore messages that do not carry the field, so that one bad message does not break the line.
+
 ### 性能、稳定性与安全
 
-75. As a MQTT 调试工程师, I want the UI to stay responsive under a sustained 100 messages/second, so that I keep working while traffic flows.
-76. As a MQTT 调试工程师, I want the in-memory cache capped at a configurable limit (default 10,000), so that memory stays bounded.
-77. As a MQTT 调试工程师, I want the message list to be virtualized, so that a huge list scrolls without lag.
-78. As a MQTT 调试工程师, I want previews truncated to a sensible length, so that one huge payload does not stall rendering.
-79. As a MQTT 调试工程师, I want payloads displayed up to 1 MB, so that large-but-real payloads remain inspectable.
-80. As a MQTT 调试工程师, I want the app to survive a broker that drops the connection, so that a network blip is not a crash.
-81. As a MQTT 调试工程师, I want the app to release connections and shut the runtime down cleanly on exit, so that I can close it without leaving sockets behind.
-82. As a MQTT 调试工程师, I want to export captured messages as JSON, CSV, HEX or raw binary, so that I can hand evidence to someone else.
-83. As a MQTT 调试工程师, I want binary export to preserve the original bytes exactly, so that an exported file re-decodes identically.
-84. As a MQTT 调试工程师, I want passwords never written to logs, so that my logs are safe to share.
-85. As a MQTT 调试工程师, I want a dark and a light theme, so that the app matches my environment.
-86. As a MQTT 调试工程师, I want resizable and collapsible side panels, so that I can give the message table the whole screen when needed.
-87. As a MQTT 调试工程师, I want the app to respect display scaling, so that text is legible on a HiDPI screen.
+82. As a MQTT 调试工程师, I want the UI to stay responsive under a sustained 100 messages/second, so that I keep working while traffic flows.
+83. As a MQTT 调试工程师, I want the in-memory cache capped at a configurable limit (default 10,000), so that memory stays bounded.
+84. As a MQTT 调试工程师, I want the message list to be virtualized, so that a huge list scrolls without lag.
+85. As a MQTT 调试工程师, I want previews truncated to a sensible length, so that one huge payload does not stall rendering.
+86. As a MQTT 调试工程师, I want payloads displayed up to 1 MB, so that large-but-real payloads remain inspectable.
+87. As a MQTT 调试工程师, I want the app to survive a broker that drops the connection, so that a network blip is not a crash.
+88. As a MQTT 调试工程师, I want the app to release connections and shut the runtime down cleanly on exit, so that I can close it without leaving sockets behind.
+89. As a MQTT 调试工程师, I want to export captured messages as JSON, CSV, HEX or raw binary, so that I can hand evidence to someone else.
+90. As a MQTT 调试工程师, I want binary export to preserve the original bytes exactly, so that an exported file re-decodes identically.
+91. As a MQTT 调试工程师, I want passwords never written to logs, so that my logs are safe to share.
+92. As a MQTT 调试工程师, I want a dark and a light theme, so that the app matches my environment.
+93. As a MQTT 调试工程师, I want resizable and collapsible side panels, so that I can give the message table the whole screen when needed.
+94. As a MQTT 调试工程师, I want the app to respect display scaling, so that text is legible on a HiDPI screen.
 
 ## Implementation Decisions
 
@@ -188,13 +198,24 @@ HEX 编解码：接受空格分隔与无空格混合输入，奇数长度或非�
 - 过滤：在缓存之上建立惰性过滤视图，条件包括 topic 包含、payload 包含、QoS 集合、retain 标志、连接 id、时间区间。过滤只影响展示，不影响缓存。
 - 消息列表用 `egui::ScrollArea::show_rows` 实现虚拟列表。
 
+### 数据序列与图表（mqtt-core / mqtt-app / mqtt-ui）
+
+「显示特定主题收到消息里特定数据」的最小实现：一条**数据序列** = 一个连接 + 一个主题过滤器 + 一个字段路径。收到消息时按序列取一个数值，攒成时间序列，画成折线图。
+
+- **取值规则在 core**（`mqtt_core::extract::extract_value`）：路径是点分隔的字段路径，数组写作 `[0]`（如 `sensors[0].value`）；空路径表示整个负载，此时负载必须本身是一个数字。JSON 里的数字直接取值，布尔当 1/0，字符串能解析成数字就取。负载不是 JSON 时没有字段，只有空路径能取到东西。
+- **序列属于一个连接**：同一个主题名可能存在于多个 Broker，所以序列带 `connection_id`，取值时连接与主题都要对上。
+- **消息要先到得了**：序列的主题如果还没有被任何订阅覆盖，应用会补一条订阅（QoS 0），否则这条序列永远没有数据。已经被覆盖的主题不重复订阅——同一主题订阅两次会把每条消息送两遍。补上的这条订阅是用户的所有物：删除序列不会删除它，删除连接会连同序列一起删除。
+- **样本只存在内存里**：每条序列保留最近 2000 个样本，超出从头部丢弃。序列的**配置**（名称、连接、主题、路径）持久化在 SQLite 的 `data_series` 表里，重启后还在。
+- **图表在中栏的「数据」页**：中栏顶部是 `消息 / 数据` 两个标签页；数据页上半部分是序列列表（色点、名称、连接、主题、路径、样本数、最新值），下半部分是折线图。列表本身就是图例，所以图上不再画图例。横轴是相对最早样本的秒数，纵轴是数值。
+- **取值与绘制分离**：core 决定「一个负载里有没有我想要的数」，app 决定「哪些消息归哪条序列」，ui 只负责画。三层各自可测。
+
 ### TLS 约束
 
 `TlsConfiguration::Simple` 只接受显式的 CA 链，因此**客户端证书认证要求同时配置 CA 证书**；没有 CA 时回退到系统根证书（仅在未使用客户端证书时）。这条约束在连接编辑界面中被显式提示。
 
 ### 存储（mqtt-storage）
 
-SQLite 单文件，位于平台配置目录下。表：`connections`、`subscriptions`、`publish_templates`、`app_settings`（`messages` 表建好但 V1.0 不启用持久化，与 PRD §9.1 一致）。
+SQLite 单文件，位于平台配置目录下。表：`connections`、`subscriptions`、`publish_templates`、`data_series`、`app_settings`（`messages` 表建好但 V1.0 不启用持久化，与 PRD §9.1 一致）。
 
 - 每个 repo 暴露 `save` / `list` / `delete`（及 `update`）四个基本操作，序列化用 `serde_json` 存结构化字段。
 - 数据库连接不可 `Sync`，因此 `Database` 内部用 `Mutex<Connection>` 串行化访问。
@@ -208,12 +229,14 @@ SQLite 单文件，位于平台配置目录下。表：`connections`、`subscrip
 - **菜单栏**：`文件` / `编辑` / `视图` / `连接` / `订阅` / `工具` / `帮助` 七个下拉菜单，跟 SolidCraft 一样放在标题栏里。
 - **功能区（ribbon）**：一排分类标签（连接 / 订阅 / 消息 / 发布 / 视图）+ 当前分类的命令组，每组以「图标 + 说明」呈现，组间有竖直分隔线，组名下沉在底部；标签行右侧是命令搜索框。命令组的位置由代码自行排布（不用嵌套布局），避免每组都占满整个宽度。
 - **左栏 / 右栏 / 底部状态栏**：都有 SolidCraft 风格的面板头——左侧是拖拽握把，中间是面板名，右侧是「…」菜单与折叠箭头。左栏是连接与订阅树，右栏是发布面板，中栏是消息监控，底部状态栏显示连接状态与收发计数。
+- **中栏分两页**：顶部是 `消息 / 数据` 两个标签页。消息页是消息表与详情，数据页是数据序列的列表与折线图。
 
 - mqtt-ui 只接受 `&mut Ui` + 数据 + 一个 `UiActions` 意图结构体。UI 不直接调用 engine，也不持有 engine 句柄；它把用户操作写入 `UiActions`，由 mqtt-app 翻译成 `MqttCommand`。
 - **菜单栏与功能区共享同一套命令词汇**（`AppCommand`）：菜单项和 ribbon 命令都产出 `AppCommand`，由 mqtt-app 统一翻译。命令可以带一个目标 id；空 id 表示「作用于当前选中项」。
 - 主题：`dark` / `light` 两种预设，通过 `egui::Visuals` 切换。
 - 消息详情按当前选中格式渲染 HEX dump / JSON tree / 文本；JSON tree 支持节点展开折叠与节点值复制。
 - 中栏里有两个滚动区域：消息表与 JSON 树。egui 的滚动区域 id 默认是「父 ui + `scroll_area`」，两个在同一 ui 里的滚动区域会撞 id，egui 会在窗口上画一条 `Second use of ScrollArea ID` 的错误。所以两者各自带 `id_salt`（`message_table` / `json_payload`）。消息表的高度留出详情区的高度，详情区因此始终可见。
+- **滚动条**：egui 的滚动区域默认会缩到内容的宽度，滚动条于是停在面板中间，看着像是右边那块面板的。要让它待在面板的边上，滚动区域得写 `auto_shrink([false, true])`：宽度铺满，高度照旧。滚动条的样式走 `Style::spacing.scroll`：悬浮在内容之上，不占地方；手柄闲置时也留一点（30%）的可见度，不然暗色主题下根本看不见，只有拖动的时候才冒出来。
 - HEX / JSON 编辑器复用同一个文本编辑控件 + 实时校验，避免引入 Monaco 之类的 Web 依赖（PRD §6.2 已明确）。
 
 ### 主题与图标
@@ -242,13 +265,13 @@ SolidCraft 的功能区图标是彩色的，命令说明是亮色，只有组名
 
 ### 截图辅助（开发工具）
 
-`mqtt-app` 带有一个可选的 `screenshot` 特性：设置 `MQTT_ASSISTANT_SCREENSHOT` 后，应用渲染若干帧、把窗口写成 PNG 并退出；`MQTT_ASSISTANT_OPEN_MENU` 可以让某一个菜单在截图时保持展开。
+`mqtt-app` 带有一个可选的 `screenshot` 特性：设置 `MQTT_ASSISTANT_SCREENSHOT` 后，应用渲染若干帧、把窗口写成 PNG 并退出；`MQTT_ASSISTANT_OPEN_MENU` 可以让某一个菜单在截图时保持展开；`MQTT_ASSISTANT_CENTER_TAB`（`message` / `data`）决定中栏显示哪一页。
 
 截图请求必须发生在**真正绘制了的一帧**里：窗口没有有效表面时 egui 会拒绝截图。因此辅助工具拆成两步——`App::logic` 负责计帧并决定何时退出，`App::ui`（只在窗口被绘制时调用）负责发起截图请求。
 
 ### 依赖选型
 
-`rumqttc`（启用 `use-rustls`）、`tokio`（rt-multi-thread / sync / time / macros）、`eframe` + `egui`、`rusqlite`（bundled）、`serde` + `serde_json`、`thiserror`、`tracing` + `tracing-subscriber`、`keyring`、`rfd`、`base64`。
+`rumqttc`（启用 `use-rustls`）、`tokio`（rt-multi-thread / sync / time / macros）、`eframe` + `egui` + `egui_plot`（折线图）、`rusqlite`（bundled）、`serde` + `serde_json`、`thiserror`、`tracing` + `tracing-subscriber`、`keyring`、`rfd`、`base64`。
 
 ## Testing Decisions
 

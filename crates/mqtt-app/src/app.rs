@@ -54,6 +54,12 @@ impl eframe::App for MqttApp {
         #[cfg(feature = "screenshot")]
         {
             self.state.ui.open_menu = crate::screenshot::open_menu();
+            if let Some(tab) = crate::screenshot::center_tab() {
+                self.state.ui.center_tab = match tab.as_str() {
+                    "data" => mqtt_ui::state::CenterTab::Data,
+                    _ => mqtt_ui::state::CenterTab::Message,
+                };
+            }
             self.screenshot.request(ui.ctx());
         }
 
@@ -62,6 +68,10 @@ impl eframe::App for MqttApp {
         let ctx = ui.ctx().clone();
 
         ctx.set_visuals(self.state.ui.theme.visuals());
+        // The scroll bars are part of the style, not of the colours.
+        ctx.all_styles_mut(|style| {
+            style.spacing.scroll = mqtt_ui::theme::Theme::scroll_style();
+        });
 
         let mut actions = UiActions::default();
         let connections = self.state.connection_views();
@@ -125,18 +135,36 @@ impl eframe::App for MqttApp {
                 });
         }
 
-        // The message monitor sits on the canvas colour, the way the SolidCraft
+        // The centre panel sits on the canvas colour, the way the SolidCraft
         // viewport sits on its own darker ground.
         egui::CentralPanel::default_margins()
             .frame(egui::Frame::new().fill(self.state.ui.theme.palette().canvas))
             .show(ui, |ui| {
-                panels::message_panel::message_panel(
-                    ui,
-                    &mut self.state.ui,
-                    &messages,
-                    &connections,
-                    &mut actions,
-                );
+                panels::center::center_tabs(ui, &mut self.state.ui);
+                ui.separator();
+
+                match self.state.ui.center_tab {
+                    mqtt_ui::state::CenterTab::Message => {
+                        panels::message_panel::message_panel(
+                            ui,
+                            &mut self.state.ui,
+                            &messages,
+                            &connections,
+                            &mut actions,
+                        );
+                    }
+                    mqtt_ui::state::CenterTab::Data => {
+                        panels::data_panel::data_panel(
+                            ui,
+                            &mut self.state.ui,
+                            &self.state.series,
+                            &self.state.samples,
+                            &connections,
+                            &subscriptions,
+                            &mut actions,
+                        );
+                    }
+                }
             });
 
         if let Some(draft) = dialogs::connection_dialog(&ctx, &mut self.state.ui) {
@@ -345,6 +373,14 @@ impl MqttApp {
             self.state.ui.theme = self.state.ui.theme.toggled();
         }
 
+        for action in actions.series {
+            match action {
+                mqtt_ui::state::SeriesAction::Add(series) => self.state.add_series(series),
+                mqtt_ui::state::SeriesAction::Update(series) => self.state.update_series(series),
+                mqtt_ui::state::SeriesAction::Remove(id) => self.state.remove_series(&id),
+            }
+        }
+
         for command in actions.commands {
             self.apply_command(command, ctx);
         }
@@ -500,6 +536,9 @@ impl MqttApp {
             }
             AppCommand::ToggleStatusBar => {
                 self.state.ui.show_status = !self.state.ui.show_status;
+            }
+            AppCommand::SetCenterTab(tab) => {
+                self.state.ui.center_tab = tab;
             }
             AppCommand::FocusSearch => {
                 self.state.ui.focus_search = true;

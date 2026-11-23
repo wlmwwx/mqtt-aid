@@ -1,8 +1,8 @@
 //! The state the UI owns, and the intentions it hands back to the application.
 
 use mqtt_core::models::{
-    ConnectionStatus, MqttConnection, MqttMessage, PayloadFormat, PublishRequest, PublishTemplate,
-    SubscribeRequest,
+    ConnectionStatus, DataSeries, MqttConnection, MqttMessage, PayloadFormat, PublishRequest,
+    PublishTemplate, SubscribeRequest,
 };
 
 use crate::theme::Theme;
@@ -60,10 +60,42 @@ pub enum AppCommand {
     ToggleLeftPanel,
     ToggleRightPanel,
     ToggleStatusBar,
+    SetCenterTab(CenterTab),
     FocusSearch,
     About,
     Shortcuts,
     Quit,
+}
+
+/// The tabs of the centre panel.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum CenterTab {
+    /// The table of the captured messages.
+    #[default]
+    Message,
+    /// The charts of the data series.
+    Data,
+}
+
+impl CenterTab {
+    pub fn label(self) -> &'static str {
+        match self {
+            CenterTab::Message => "消息",
+            CenterTab::Data => "数据",
+        }
+    }
+
+    pub fn all() -> &'static [CenterTab] {
+        &[CenterTab::Message, CenterTab::Data]
+    }
+}
+
+/// What should happen to a data series.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SeriesAction {
+    Add(DataSeries),
+    Update(DataSeries),
+    Remove(String),
 }
 
 /// The categories of the ribbon.
@@ -155,6 +187,13 @@ pub struct SubscribeDraft {
     pub qos: u8,
 }
 
+/// The editor of a data series.
+#[derive(Debug, Clone)]
+pub struct SeriesDraft {
+    pub series: DataSeries,
+    pub is_new: bool,
+}
+
 /// Counters shown in the status bar.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Stats {
@@ -179,6 +218,10 @@ pub struct UiState {
     pub publish: PublishPanelState,
     pub connection_draft: Option<ConnectionDraft>,
     pub subscribe_draft: Option<SubscribeDraft>,
+    /// The editor of a data series.
+    pub series_draft: Option<SeriesDraft>,
+    /// Which tab of the centre panel is shown.
+    pub center_tab: CenterTab,
     pub left_width: f32,
     pub right_width: f32,
     pub show_left: bool,
@@ -219,6 +262,8 @@ impl Default for UiState {
             publish: PublishPanelState::default(),
             connection_draft: None,
             subscribe_draft: None,
+            series_draft: None,
+            center_tab: CenterTab::default(),
             left_width: 260.0,
             right_width: 320.0,
             show_left: true,
@@ -265,6 +310,8 @@ pub struct UiActions {
     pub send_to_publisher: Option<MqttMessage>,
     pub toggle_theme: bool,
     pub set_cache_limit: Option<usize>,
+    /// What should happen to the data series.
+    pub series: Vec<SeriesAction>,
     /// Commands issued by the menu bar and the ribbon.
     pub commands: Vec<AppCommand>,
 }

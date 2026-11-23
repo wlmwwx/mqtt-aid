@@ -95,3 +95,63 @@ fn a_text_payload_is_shown_as_it_is() {
     assert!(text.contains("hello"), "the payload is missing:\n{text}");
     assert!(!text.contains("use of ScrollArea ID"));
 }
+
+/// The scroll bar of the table belongs at the right edge of the panel.
+///
+/// A scroll area shrinks to the width of its content by default, and then
+/// its scroll bar ends up in the middle of the panel, where it looks like
+/// it belongs to the panel on the right.
+#[test]
+fn the_scroll_bar_of_the_table_is_at_the_edge_of_the_panel() {
+    let ctx = Context::default();
+    let mut state = UiState::default();
+    let mut actions = UiActions::default();
+
+    let width = 800.0;
+    let messages: Vec<MqttMessage> = (0..40)
+        .map(|index| MqttMessage {
+            id: format!("m{index}"),
+            connection_id: "c1".to_string(),
+            topic: format!("sensors/room/{index}"),
+            payload: b"21.5".to_vec(),
+            qos: 0,
+            retain: false,
+            received_at: 1_700_000_000_000,
+            version: MqttVersion::V5,
+            properties: None,
+        })
+        .collect();
+
+    let input = RawInput {
+        screen_rect: Some(egui::Rect::from_min_size(
+            egui::Pos2::ZERO,
+            egui::vec2(width, 600.0),
+        )),
+        ..Default::default()
+    };
+    let output = ctx.run_ui(input, |ui| {
+        egui::CentralPanel::default().show(ui, |ui| {
+            message_panel(ui, &mut state, &messages, &[], &mut actions);
+        });
+    });
+
+    // The handle of the scroll bar: a small filled rectangle.
+    let mut handle = None;
+    for shape in &output.shapes {
+        if let egui::Shape::Rect(rect) = &shape.shape
+            && rect.rect.width() < 14.0
+            && rect.rect.height() > 10.0
+            && rect.rect.min.x > width / 2.0
+        {
+            handle = Some(rect.rect);
+        }
+    }
+    output.drop_without_applying_deltas();
+
+    let handle = handle.expect("the table has no scroll bar at the right edge");
+    assert!(
+        handle.max.x > width - 20.0,
+        "the scroll bar is at x={} instead of at the edge of the panel",
+        handle.min.x
+    );
+}

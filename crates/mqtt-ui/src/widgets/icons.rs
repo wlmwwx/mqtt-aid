@@ -37,6 +37,7 @@ pub enum Icon {
     Send,
     Grip,
     Ellipsis,
+    Chart,
 }
 
 impl Icon {
@@ -71,6 +72,7 @@ impl Icon {
             Icon::Send => "send",
             Icon::Grip => "grip",
             Icon::Ellipsis => "ellipsis",
+            Icon::Chart => "chart",
         }
     }
 }
@@ -495,11 +497,38 @@ pub fn draw(painter: &Painter, icon: Icon, rect: Rect, color: Color32, width: f3
                 painter.circle_filled(center + Vec2::new(size * offset, 0.0), size * 0.09, color);
             }
         }
+        Icon::Chart => {
+            // Two axes and a line that goes up and down.
+            let left = center + Vec2::new(-half * 0.9, half * 0.7);
+            let bottom = center + Vec2::new(-half * 0.9, -half * 0.7);
+            painter.line_segment([left, bottom], stroke);
+            painter.line_segment(
+                [bottom, center + Vec2::new(half * 0.9, -half * 0.7)],
+                stroke,
+            );
+            painter.add(Shape::line(
+                vec![
+                    center + Vec2::new(-half * 0.7, half * 0.3),
+                    center + Vec2::new(-half * 0.2, -half * 0.3),
+                    center + Vec2::new(half * 0.2, half * 0.1),
+                    center + Vec2::new(half * 0.7, -half * 0.5),
+                ],
+                stroke,
+            ));
+        }
     }
 }
 
 /// A small button that shows an icon.
 pub fn icon_button(ui: &mut egui::Ui, icon: Icon, tooltip: &str) -> bool {
+    icon_button_response(ui, icon, tooltip).clicked()
+}
+
+/// A small button that shows an icon, with its response.
+///
+/// The response carries the place of the button, which a test needs to click
+/// it.
+pub fn icon_button_response(ui: &mut egui::Ui, icon: Icon, tooltip: &str) -> egui::Response {
     let size = egui::vec2(20.0, 20.0);
     let (rect, response) = ui.allocate_exact_size(size, egui::Sense::click());
     if ui.is_rect_visible(rect) {
@@ -510,7 +539,7 @@ pub fn icon_button(ui: &mut egui::Ui, icon: Icon, tooltip: &str) -> bool {
         };
         draw(ui.painter(), icon, rect, color, 1.4);
     }
-    response.on_hover_text(tooltip).clicked()
+    response.on_hover_text(tooltip)
 }
 
 /// A toggle button that shows an icon.

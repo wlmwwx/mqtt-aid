@@ -1,6 +1,7 @@
 //! Modal dialogs: the connection editor, the subscribe form and the settings.
 
 pub mod info;
+pub mod series;
 pub mod settings;
 
 use egui::RichText;
