@@ -75,7 +75,7 @@ impl eframe::App for MqttApp {
 
         let mut actions = UiActions::default();
         let connections = self.state.connection_views();
-        let subscriptions = self.state.visible_subscriptions();
+        let subscriptions = self.state.subscriptions.clone();
         let messages = self.state.visible_messages();
 
         // The title bar and the ribbon sit above everything else.
@@ -170,7 +170,7 @@ impl eframe::App for MqttApp {
         if let Some(draft) = dialogs::connection_dialog(&ctx, &mut self.state.ui) {
             self.save_connection(draft);
         }
-        if let Some(draft) = dialogs::subscribe_dialog(&mut self.state.ui, &ctx) {
+        if let Some(draft) = dialogs::subscribe_dialog(&mut self.state.ui, &ctx, &connections) {
             self.subscribe(draft);
         }
         if let Some(limit) =
@@ -441,8 +441,14 @@ impl MqttApp {
                 let id = self.resolve_connection(&id);
                 let _ = self.state.engine.execute(MqttCommand::Disconnect(id));
             }
-            AppCommand::NewSubscription => {
-                let Some(connection_id) = self.state.ui.selected_connection.clone() else {
+            AppCommand::NewSubscription(id) => {
+                // An empty id means the connection that is selected.
+                let connection_id = if id.is_empty() {
+                    self.state.ui.selected_connection.clone()
+                } else {
+                    Some(id)
+                };
+                let Some(connection_id) = connection_id else {
                     tracing::warn!("select a connection before subscribing");
                     return;
                 };

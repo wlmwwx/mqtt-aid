@@ -62,7 +62,12 @@ pub fn commands_for(tab: RibbonTab) -> Vec<Command> {
             ),
         ],
         RibbonTab::Subscription => vec![
-            command("新建订阅", Icon::Plus, "创建", AppCommand::NewSubscription),
+            command(
+                "新建订阅",
+                Icon::Plus,
+                "创建",
+                AppCommand::NewSubscription(String::new()),
+            ),
             command(
                 "取消订阅",
                 Icon::Trash,

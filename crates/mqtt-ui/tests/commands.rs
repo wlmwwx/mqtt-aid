@@ -15,7 +15,7 @@ fn all_commands() -> Vec<mqtt_ui::state::AppCommand> {
         AppCommand::DeleteConnection(String::new()),
         AppCommand::Connect(String::new()),
         AppCommand::Disconnect(String::new()),
-        AppCommand::NewSubscription,
+        AppCommand::NewSubscription(String::new()),
         AppCommand::Unsubscribe(String::new()),
         AppCommand::ToggleSubscriptionPause(String::new()),
         AppCommand::ClearMessages,

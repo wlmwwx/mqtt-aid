@@ -141,10 +141,14 @@ pub fn connection_dialog(
     }
 }
 
+/// The width of the subscribe form and of the fields in it.
+const SUBSCRIBE_WIDTH: f32 = 380.0;
+
 /// The subscribe form. Returns the draft when the user subscribes.
 pub fn subscribe_dialog(
     state: &mut UiState,
     ctx: &egui::Context,
+    connections: &[crate::state::ConnectionView],
 ) -> Option<crate::state::SubscribeDraft> {
     let draft = state.subscribe_draft.as_mut()?;
 
@@ -156,7 +160,27 @@ pub fn subscribe_dialog(
         .resizable(false)
         .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
         .show(ctx, |ui| {
-            ui.set_width(380.0);
+            ui.set_width(SUBSCRIBE_WIDTH);
+
+            // A subscription belongs to a connection, so the connection is
+            // part of the form.
+            ui.label("Connection");
+            egui::ComboBox::from_id_salt("subscribe-connection")
+                .selected_text(connection_name(connections, &draft.connection_id))
+                // An infinite width would make the window's rect NaN, and
+                // egui would stop with a panic.
+                .width(SUBSCRIBE_WIDTH)
+                .show_ui(ui, |ui| {
+                    for connection in connections {
+                        ui.selectable_label(
+                            draft.connection_id == connection.config.id,
+                            connection.config.name.clone(),
+                        )
+                        .clicked()
+                        .then(|| draft.connection_id = connection.config.id.clone());
+                    }
+                });
+
             ui.label("Topic filter");
             ui.add(
                 egui::TextEdit::singleline(&mut draft.topic)
@@ -200,4 +224,13 @@ pub fn subscribe_dialog(
 /// The default format for a new subscription.
 pub fn default_format() -> PayloadFormat {
     PayloadFormat::Auto
+}
+
+/// The name of a connection, or a placeholder when it is gone.
+fn connection_name(connections: &[crate::state::ConnectionView], connection_id: &str) -> String {
+    connections
+        .iter()
+        .find(|connection| connection.config.id == connection_id)
+        .map(|connection| connection.config.name.clone())
+        .unwrap_or_else(|| "（连接已删除）".to_string())
 }

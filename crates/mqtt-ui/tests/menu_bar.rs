@@ -142,7 +142,7 @@ fn the_connection_menu_connects() {
 fn the_subscription_menu_subscribes() {
     let ctx = Context::default();
     let commands = click_entry(&ctx, subscription_menu, "新建订阅…");
-    assert_eq!(commands, vec![AppCommand::NewSubscription]);
+    assert_eq!(commands, vec![AppCommand::NewSubscription(String::new())]);
 }
 
 #[test]

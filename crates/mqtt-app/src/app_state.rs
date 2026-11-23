@@ -144,19 +144,6 @@ impl AppState {
             .collect()
     }
 
-    /// The subscriptions of the selected connection.
-    pub fn visible_subscriptions(&self) -> Vec<MqttSubscription> {
-        match &self.ui.selected_connection {
-            Some(id) => self
-                .subscriptions
-                .iter()
-                .filter(|subscription| &subscription.connection_id == id)
-                .cloned()
-                .collect(),
-            None => Vec::new(),
-        }
-    }
-
     /// The messages that match the current search and filters.
     pub fn visible_messages(&self) -> Vec<MqttMessage> {
         let search = self.ui.search.trim().to_lowercase();

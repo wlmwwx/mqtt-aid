@@ -41,7 +41,7 @@ pub enum AppCommand {
     DeleteConnection(String),
     Connect(String),
     Disconnect(String),
-    NewSubscription,
+    NewSubscription(String),
     Unsubscribe(String),
     ToggleSubscriptionPause(String),
     ClearMessages,

@@ -23,7 +23,8 @@ canvas.
 - **Dockable panels** — the browser (connections and subscriptions) on the left,
   the publish panel on the right, the status bar at the bottom, the message
   monitor in the middle. Each panel has a header with a drag grip, an overflow
-  menu and a collapse arrow.
+  menu and a collapse arrow. The browser is a tree: every subscription sits
+  under the connection it belongs to.
 - **Two pages in the middle** — `消息` shows the captured messages, `数据` shows
   the charts of the data series.
 
@@ -39,6 +40,7 @@ command, so a command added to one is available in the other.
   connection (Disconnected / Connecting / Connected / Reconnecting / Error).
 - **Topic subscriptions** — exact topics, the `+` single-level wildcard and the `#`
   multi-level wildcard, with per-subscription QoS and a default display format.
+  A subscription belongs to one connection, and the browser shows it there.
 - **Live message monitor** — time, topic, QoS, retain flag, size and a preview for
   every message, plus a detail view with the raw bytes.
 - **Payload formats** — Text, HEX (with an offset/ASCII dump), JSON (with an
@@ -107,7 +109,7 @@ publish, assert on the events that come back.
 crates/mqtt-core   unit tests for the format engine and the topic rules
 crates/mqtt-engine integration tests against a live broker
 crates/mqtt-storage round trips through SQLite
-crates/mqtt-ui     headless UI tests: the menus, the ribbon, the message and data panels
+crates/mqtt-ui     headless UI tests: the menus, the ribbon, the browser, the message and data panels
 crates/mqtt-app    end to end: state, engine and storage together
 ```
 

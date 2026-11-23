@@ -22,20 +22,34 @@ pub fn status_color(status: ConnectionStatus, palette: &crate::theme::Palette) -
     }
 }
 
-/// The connection list and the subscription list.
+/// How far the subscriptions of a connection are indented.
+const INDENT: f32 = 18.0;
+
+/// Where the buttons of the panel are drawn, so that a test can click them.
+#[derive(Debug, Default)]
+pub struct LeftPanelLayout {
+    /// The button that adds a subscription to a connection, by connection id.
+    pub subscribe_buttons: Vec<(String, egui::Rect)>,
+}
+
+/// The connection list with the subscriptions of each connection under it.
 pub fn left_panel(
     ui: &mut Ui,
     state: &mut UiState,
     connections: &[ConnectionView],
     subscriptions: &[MqttSubscription],
     actions: &mut UiActions,
-) {
+) -> LeftPanelLayout {
+    let mut layout = LeftPanelLayout::default();
+
     let action = panel_header::panel_header(ui, "浏览器", |ui| {
         if ui.button("新建连接…").clicked() {
             actions.commands.push(AppCommand::NewConnection);
         }
         if ui.button("新建订阅…").clicked() {
-            actions.commands.push(AppCommand::NewSubscription);
+            actions
+                .commands
+                .push(AppCommand::NewSubscription(String::new()));
         }
     });
     if action == HeaderAction::Collapse {
@@ -45,7 +59,7 @@ pub fn left_panel(
     ui.add_space(spacing::GAP);
 
     if state.left_collapsed {
-        return;
+        return layout;
     }
 
     section(
@@ -61,28 +75,26 @@ pub fn left_panel(
     }
 
     for view in connections {
-        connection_row(ui, state, view, actions);
+        // The subscriptions of a connection live under it: a subscription
+        // belongs to one connection, not to the application.
+        let own: Vec<&MqttSubscription> = subscriptions
+            .iter()
+            .filter(|subscription| subscription.connection_id == view.config.id)
+            .collect();
+        connection_row(ui, state, view, own.len(), actions, &mut layout);
+
+        if !own.is_empty() {
+            ui.indent(("subscriptions", view.config.id.clone()), |ui| {
+                for subscription in own {
+                    subscription_row(ui, state, subscription, actions);
+                }
+            });
+        }
+
         ui.separator();
     }
 
-    ui.add_space(spacing::GAP);
-
-    section(
-        ui,
-        "订阅",
-        subscriptions.len(),
-        AppCommand::NewSubscription,
-        actions,
-    );
-
-    if subscriptions.is_empty() {
-        empty(ui, "还没有订阅");
-    }
-
-    for subscription in subscriptions {
-        subscription_row(ui, state, subscription, actions);
-        ui.separator();
-    }
+    layout
 }
 
 /// A section title with a count and an add button.
@@ -127,7 +139,9 @@ fn connection_row(
     ui: &mut Ui,
     state: &mut UiState,
     view: &ConnectionView,
+    subscription_count: usize,
     actions: &mut UiActions,
+    layout: &mut LeftPanelLayout,
 ) {
     let selected = state.selected_connection.as_ref() == Some(&view.config.id);
 
@@ -150,12 +164,6 @@ fn connection_row(
             state.selected_connection = Some(view.config.id.clone());
         }
 
-        ui.label(
-            RichText::new(format!("{}:{}", view.config.host, view.config.port))
-                .small()
-                .color(state.theme.palette().text_dim),
-        );
-
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if icons::icon_button(ui, Icon::Trash, "删除连接") {
                 actions.delete_connection.push(view.config.id.clone());
@@ -164,6 +172,17 @@ fn connection_row(
                 actions
                     .commands
                     .push(AppCommand::EditConnection(view.config.id.clone()));
+            }
+            // A subscription is made on this connection, not on the
+            // application.
+            let subscribe = icons::icon_button_response(ui, Icon::Plus, "新建订阅");
+            layout
+                .subscribe_buttons
+                .push((view.config.id.clone(), subscribe.rect));
+            if subscribe.clicked() {
+                actions
+                    .commands
+                    .push(AppCommand::NewSubscription(view.config.id.clone()));
             }
             let plug = if view.status == ConnectionStatus::Connected
                 || view.status == ConnectionStatus::Reconnecting
@@ -189,6 +208,22 @@ fn connection_row(
                 }
             }
         });
+    });
+
+    // The address of the broker and how many subscriptions the connection
+    // carries, on a line of their own: the row above is full of buttons.
+    ui.horizontal(|ui| {
+        ui.add_space(INDENT);
+        ui.label(
+            RichText::new(format!("{}:{}", view.config.host, view.config.port))
+                .small()
+                .color(state.theme.palette().text_dim),
+        );
+        ui.label(
+            RichText::new(format!("· {subscription_count} 订阅"))
+                .small()
+                .color(state.theme.palette().text_faint),
+        );
     });
 }
 
@@ -224,8 +259,10 @@ fn subscription_row(
             .add(egui::Label::new(label).sense(egui::Sense::click()))
             .on_hover_text("选择订阅");
         if name.clicked() {
-            // The menu bar commands act on the selected subscription.
+            // The menu bar commands act on the selected subscription, and
+            // the connection it belongs to becomes the current one.
             state.selected_subscription = Some(subscription.id.clone());
+            state.selected_connection = Some(subscription.connection_id.clone());
         }
 
         ui.label(

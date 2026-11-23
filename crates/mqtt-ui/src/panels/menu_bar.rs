@@ -239,7 +239,9 @@ pub fn subscription_menu(ui: &mut Ui, actions: &mut UiActions) -> Vec<Entry> {
         response: ui.button("新建订阅…"),
     });
     if entries[0].response.clicked() {
-        actions.commands.push(AppCommand::NewSubscription);
+        actions
+            .commands
+            .push(AppCommand::NewSubscription(String::new()));
     }
 
     entries.push(Entry {
