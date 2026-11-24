@@ -71,6 +71,8 @@ impl eframe::App for MqttApp {
         // The scroll bars are part of the style, not of the colours.
         ctx.all_styles_mut(|style| {
             style.spacing.scroll = mqtt_ui::theme::Theme::scroll_style();
+            // The type scale and the spacing of the widgets.
+            mqtt_ui::theme::Theme::apply_style(style);
         });
 
         let mut actions = UiActions::default();

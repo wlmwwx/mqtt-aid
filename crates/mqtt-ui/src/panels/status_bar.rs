@@ -39,8 +39,8 @@ pub fn status_bar(
         .map(|view| view.config.name.clone())
         .unwrap_or_else(|| "—".to_string());
     let status = current
-        .map(|view| view.status.label())
-        .unwrap_or("Disconnected");
+        .map(|view| crate::state::connection_status_label(view.status))
+        .unwrap_or("未连接");
 
     let dim = ui.visuals().weak_text_color();
 

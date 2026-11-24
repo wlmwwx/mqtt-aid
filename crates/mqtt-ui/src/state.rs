@@ -14,6 +14,17 @@ pub struct ConnectionView {
     pub status: ConnectionStatus,
 }
 
+/// The name of a connection state, in the language of the interface.
+pub fn connection_status_label(status: ConnectionStatus) -> &'static str {
+    match status {
+        ConnectionStatus::Connected => "已连接",
+        ConnectionStatus::Connecting => "连接中",
+        ConnectionStatus::Reconnecting => "重连中",
+        ConnectionStatus::Error => "错误",
+        ConnectionStatus::Disconnected => "未连接",
+    }
+}
+
 /// What should end up on the clipboard.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CopyKind {

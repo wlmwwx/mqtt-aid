@@ -155,11 +155,24 @@ pub fn message_panel(
     ui.separator();
 
     if messages.is_empty() {
+        // An empty state that says what to do, not only that there is
+        // nothing here.
         ui.centered_and_justified(|ui| {
+            ui.add_space(48.0);
+            let (rect, _) = ui.allocate_exact_size(egui::vec2(36.0, 36.0), egui::Sense::hover());
+            icons::draw(
+                ui.painter(),
+                Icon::Layers,
+                rect,
+                ui.visuals().weak_text_color().gamma_multiply(0.6),
+                1.4,
+            );
+            ui.add_space(10.0);
+            ui.label(RichText::new("还没有捕获到消息").color(ui.visuals().weak_text_color()));
             ui.label(
-                RichText::new("还没有捕获到消息")
-                    .color(ui.visuals().weak_text_color())
-                    .italics(),
+                RichText::new("订阅一个主题，消息就会出现在这里")
+                    .small()
+                    .color(ui.visuals().weak_text_color()),
             );
         });
         return;

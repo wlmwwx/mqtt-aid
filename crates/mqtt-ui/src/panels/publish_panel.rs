@@ -5,6 +5,7 @@ use mqtt_core::format::{FormatError, codec_for};
 use mqtt_core::models::{PayloadFormat, PublishRequest};
 
 use crate::state::{ConnectionView, UiActions, UiState};
+use crate::widgets::icons::{self, Icon};
 use crate::widgets::panel_header::{self, HeaderAction};
 
 /// Encode the payload according to the selected format.
@@ -49,6 +50,7 @@ pub fn publish_panel(
         .map(|view| view.config.name.clone())
         .unwrap_or_else(|| "No connection".to_string());
 
+    ui.label("连接");
     let combo_width = ui.available_width();
     egui::ComboBox::from_id_salt("publish-connection")
         .selected_text(selected_name)
@@ -160,9 +162,26 @@ pub fn publish_panel(
         && !state.publish.topic.trim().is_empty()
         && encoded.is_ok();
 
-    if ui
-        .add_enabled(can_publish, egui::Button::new("发布"))
-        .clicked()
+    // The publish button is the point of the panel: it gets the accent
+    // colour and the whole width of the panel.
+    let accent = ui.visuals().selection.stroke.color;
+    let publish = ui.add_enabled(
+        can_publish,
+        egui::Button::new(egui::RichText::new("发布").strong().color(if can_publish {
+            egui::Color32::WHITE
+        } else {
+            ui.visuals().weak_text_color()
+        }))
+        .fill(if can_publish {
+            accent
+        } else {
+            // A muted fill, so that the button still reads as a button.
+            ui.visuals().widgets.hovered.bg_fill
+        })
+        .stroke(egui::Stroke::NONE)
+        .min_size(egui::vec2(ui.available_width(), 28.0)),
+    );
+    if publish.clicked()
         && let (Some(connection_id), Ok(payload)) =
             (state.publish.connection_id.clone(), encoded.clone())
     {
@@ -187,7 +206,7 @@ pub fn publish_panel(
                 if ui.button(template.name.clone()).clicked() {
                     actions.load_template.push(template.id.clone());
                 }
-                if ui.button("🗑").on_hover_text("删除模板").clicked() {
+                if icons::icon_button(ui, Icon::Trash, "删除模板") {
                     actions.delete_template.push(template.id.clone());
                 }
             });

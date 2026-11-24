@@ -177,6 +177,10 @@ fn chart(ui: &mut Ui, series: &[DataSeries], samples: &Samples, palette: &Palett
         .height(ui.available_height().max(160.0))
         .x_axis_label("秒")
         .y_axis_label("数值")
+        // The grid is a hint, not the subject: it stays quiet so that the
+        // curve is the loudest thing in the panel.
+        .grid_color(palette.border)
+        .grid_fade(0.7)
         .allow_zoom(true)
         .allow_drag(true)
         .show(ui, |plot_ui| {

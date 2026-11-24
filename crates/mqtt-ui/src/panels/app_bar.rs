@@ -115,14 +115,13 @@ fn status_pill(ui: &mut Ui, state: &UiState, connections: &[ConnectionView]) {
         .unwrap_or(ConnectionStatus::Disconnected);
 
     let palette = state.theme.palette();
-    let (label, color) = match status {
-        ConnectionStatus::Connected => ("已连接", palette.success),
-        ConnectionStatus::Connecting | ConnectionStatus::Reconnecting => {
-            ("连接中", palette.warning)
-        }
-        ConnectionStatus::Error => ("错误", palette.danger),
-        ConnectionStatus::Disconnected => ("未连接", palette.text_faint),
+    let color = match status {
+        ConnectionStatus::Connected => palette.success,
+        ConnectionStatus::Connecting | ConnectionStatus::Reconnecting => palette.warning,
+        ConnectionStatus::Error => palette.danger,
+        ConnectionStatus::Disconnected => palette.text_faint,
     };
+    let label = crate::state::connection_status_label(status);
 
     let text_color = ui.visuals().text_color();
     let galley = ui.painter().layout_no_wrap(

@@ -282,10 +282,12 @@ fn ribbon_body(ui: &mut Ui, state: &mut UiState, actions: &mut UiActions) -> Vec
             + group_width / 2.0
             - cell / 2.0;
 
+        // A little above the bottom of the ribbon: the name of the group
+        // would otherwise be cut off by the panel below.
         painter.galley(
             egui::pos2(
                 group_center - galley.size().x / 2.0,
-                origin.y + height - galley.size().y,
+                origin.y + height - galley.size().y - 4.0,
             ),
             galley,
             palette.text_group,

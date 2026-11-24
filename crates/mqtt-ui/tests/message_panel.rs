@@ -155,3 +155,56 @@ fn the_scroll_bar_of_the_table_is_at_the_edge_of_the_panel() {
         handle.min.x
     );
 }
+
+/// The names of the columns stand above the columns themselves.
+///
+/// The header and the rows are drawn by hand, cell by cell: if one of them
+/// moved, the table would be unreadable — a topic that starts under the
+/// wrong column.
+#[test]
+fn the_header_of_the_table_stands_above_its_columns() {
+    let ctx = Context::default();
+    let mut state = UiState::default();
+    let mut actions = UiActions::default();
+    let messages = vec![json_message()];
+
+    let input = RawInput {
+        screen_rect: Some(egui::Rect::from_min_size(
+            egui::Pos2::ZERO,
+            egui::vec2(800.0, 600.0),
+        )),
+        ..Default::default()
+    };
+    let output = ctx.run_ui(input, |ui| {
+        egui::CentralPanel::default().show(ui, |ui| {
+            message_panel(ui, &mut state, &messages, &[], &mut actions);
+        });
+    });
+
+    let mut places: Vec<(String, egui::Pos2)> = Vec::new();
+    for shape in &output.shapes {
+        if let egui::Shape::Text(text_shape) = &shape.shape {
+            places.push((text_shape.galley.job.text.to_string(), text_shape.pos));
+        }
+    }
+    output.drop_without_applying_deltas();
+
+    let x_of = |needle: &str| {
+        places
+            .iter()
+            .find(|(text, _)| text == needle)
+            .map(|(_, place)| place.x)
+            .unwrap_or_else(|| panic!("{needle} is not shown"))
+    };
+
+    assert_eq!(
+        x_of("主题"),
+        x_of("sensors/room/temperature"),
+        "the topic is not under the name of its column"
+    );
+    assert_eq!(
+        x_of("时间"),
+        x_of("11-14 22:13:20"),
+        "the time is not under the name of its column"
+    );
+}

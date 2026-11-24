@@ -47,6 +47,8 @@ impl Theme {
                 icon: Color32::from_rgb(0x4E, 0xA1, 0xDC),
                 // The secondary colour of the ribbon icons.
                 icon_alt: Color32::from_rgb(0x32, 0x87, 0xD1),
+                // The fill of a row the mouse is over.
+                row_hover: Color32::from_rgb(0x36, 0x3C, 0x48),
                 success: Color32::from_rgb(0x3C, 0xAA, 0x3C),
                 warning: Color32::from_rgb(0xC8, 0xA2, 0x4A),
                 danger: Color32::from_rgb(0xFF, 0x5E, 0x5B),
@@ -66,6 +68,8 @@ impl Theme {
                 tab_active: Color32::from_rgb(0xD6, 0xE4, 0xF7),
                 icon: Color32::from_rgb(0x2F, 0x7A, 0xC4),
                 icon_alt: Color32::from_rgb(0x1D, 0x5E, 0xA0),
+                // The fill of a row the mouse is over.
+                row_hover: Color32::from_rgb(0xE7, 0xEA, 0xEF),
                 success: Color32::from_rgb(0x2E, 0x7D, 0x32),
                 warning: Color32::from_rgb(0x9A, 0x6B, 0x12),
                 danger: Color32::from_rgb(0xC0, 0x36, 0x33),
@@ -130,6 +134,79 @@ impl Theme {
         scroll.interact_handle_opacity = 0.95;
         scroll
     }
+
+    /// The type scale of the application.
+    ///
+    /// Every text in the application takes its size from here, so the window
+    /// reads as one piece instead of a pile of widgets.
+    pub fn text_styles() -> Vec<(egui::TextStyle, egui::FontId)> {
+        vec![
+            (
+                egui::TextStyle::Body,
+                egui::FontId::proportional(typography::BODY),
+            ),
+            (
+                egui::TextStyle::Button,
+                egui::FontId::proportional(typography::BODY),
+            ),
+            (
+                egui::TextStyle::Small,
+                egui::FontId::proportional(typography::SMALL),
+            ),
+            (
+                egui::TextStyle::Monospace,
+                egui::FontId::monospace(typography::SMALL),
+            ),
+            (
+                egui::TextStyle::Heading,
+                egui::FontId::proportional(typography::HEADING),
+            ),
+            (
+                egui::TextStyle::Name("title".into()),
+                egui::FontId::proportional(typography::TITLE),
+            ),
+        ]
+    }
+
+    /// The spacing and the rounding of the widgets.
+    ///
+    /// The application is dense on purpose — a debugging tool shows a lot of
+    /// rows — so the widgets sit close to each other and the corners are
+    /// rounded just enough to tell a row from its neighbour.
+    pub fn apply_style(style: &mut egui::Style) {
+        for (text_style, font) in Self::text_styles() {
+            style.text_styles.insert(text_style, font);
+        }
+
+        style.spacing.item_spacing = egui::vec2(6.0, 4.0);
+        style.spacing.button_padding = egui::vec2(8.0, 4.0);
+        style.spacing.menu_margin = egui::Margin::symmetric(6, 6);
+        style.spacing.window_margin = egui::Margin::symmetric(12, 12);
+        style.spacing.indent = 14.0;
+
+        style.visuals.window_corner_radius = egui::CornerRadius::same(8);
+        style.visuals.menu_corner_radius = egui::CornerRadius::same(6);
+        style.visuals.window_shadow = egui::epaint::Shadow {
+            offset: [0, 4],
+            blur: 12,
+            spread: 0,
+            color: egui::Color32::from_black_alpha(64),
+        };
+    }
+}
+
+/// The sizes of the text.
+pub mod typography {
+    /// The captions and the group names.
+    pub const CAPTION: f32 = 11.0;
+    /// The secondary text and the monospace text.
+    pub const SMALL: f32 = 12.0;
+    /// The body text.
+    pub const BODY: f32 = 13.0;
+    /// The titles.
+    pub const TITLE: f32 = 15.0;
+    /// The headings of the windows.
+    pub const HEADING: f32 = 17.0;
 }
 
 /// The colours of a theme.
@@ -161,6 +238,8 @@ pub struct Palette {
     pub icon: Color32,
     /// The secondary colour of the ribbon icons.
     pub icon_alt: Color32,
+    /// The fill of a row the mouse is over.
+    pub row_hover: Color32,
     pub success: Color32,
     pub warning: Color32,
     pub danger: Color32,
