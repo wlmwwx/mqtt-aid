@@ -2,6 +2,7 @@
 
 use egui::{Rect, RichText, Ui};
 
+use crate::i18n;
 use crate::state::{CenterTab, UiState};
 use crate::widgets::tabs::tab_button;
 
@@ -15,12 +16,11 @@ pub fn center_tabs(ui: &mut Ui, state: &mut UiState) -> Vec<(CenterTab, Rect)> {
     ui.horizontal(|ui| {
         for tab in CenterTab::all() {
             let active = state.center_tab == *tab;
+            let label = i18n::t(tab.label());
             let text = if active {
-                RichText::new(tab.label())
-                    .color(palette.accent_text)
-                    .strong()
+                RichText::new(label).color(palette.accent_text).strong()
             } else {
-                RichText::new(tab.label()).color(palette.text)
+                RichText::new(label).color(palette.text)
             };
 
             let response = tab_button(ui, text, active, palette.tab_active);

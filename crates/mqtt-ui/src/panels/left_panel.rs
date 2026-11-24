@@ -7,6 +7,7 @@
 use egui::{Color32, RichText, Ui};
 use mqtt_core::models::{ConnectionStatus, MqttSubscription, PayloadFormat};
 
+use crate::i18n;
 use crate::state::{AppCommand, ConnectionView, UiActions, UiState};
 use crate::theme::spacing;
 use crate::widgets::icons::{self, Icon};
@@ -42,11 +43,11 @@ pub fn left_panel(
 ) -> LeftPanelLayout {
     let mut layout = LeftPanelLayout::default();
 
-    let action = panel_header::panel_header(ui, "浏览器", |ui| {
-        if ui.button("新建连接…").clicked() {
+    let action = panel_header::panel_header(ui, i18n::t("浏览器"), |ui| {
+        if ui.button(i18n::t("新建连接…")).clicked() {
             actions.commands.push(AppCommand::NewConnection);
         }
-        if ui.button("新建订阅…").clicked() {
+        if ui.button(i18n::t("新建订阅…")).clicked() {
             actions
                 .commands
                 .push(AppCommand::NewSubscription(String::new()));
@@ -64,14 +65,14 @@ pub fn left_panel(
 
     section(
         ui,
-        "连接",
+        i18n::t("连接"),
         connections.len(),
         AppCommand::NewConnection,
         actions,
     );
 
     if connections.is_empty() {
-        empty(ui, "还没有连接");
+        empty(ui, i18n::t("还没有连接"));
     }
 
     for view in connections {
@@ -130,7 +131,7 @@ fn section(ui: &mut Ui, title: &str, count: usize, add: AppCommand, actions: &mu
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if ui
                 .add(egui::Button::new(RichText::new("+").size(14.0)))
-                .on_hover_text("新建")
+                .on_hover_text(i18n::t("新建"))
                 .clicked()
             {
                 actions.commands.push(add.clone());
@@ -228,23 +229,23 @@ fn connection_row(
             };
             let name = ui
                 .add(egui::Label::new(label).sense(egui::Sense::click()))
-                .on_hover_text("选择连接");
+                .on_hover_text(i18n::t("选择连接"));
             if name.clicked() {
                 state.selected_connection = Some(view.config.id.clone());
             }
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if icons::icon_button(ui, Icon::Trash, "删除连接") {
+                if icons::icon_button(ui, Icon::Trash, i18n::t("删除连接")) {
                     actions.delete_connection.push(view.config.id.clone());
                 }
-                if icons::icon_button(ui, Icon::Pencil, "编辑连接") {
+                if icons::icon_button(ui, Icon::Pencil, i18n::t("编辑连接")) {
                     actions
                         .commands
                         .push(AppCommand::EditConnection(view.config.id.clone()));
                 }
                 // A subscription is made on this connection, not on the
                 // application.
-                let subscribe = icons::icon_button_response(ui, Icon::Plus, "新建订阅");
+                let subscribe = icons::icon_button_response(ui, Icon::Plus, i18n::t("新建订阅"));
                 layout
                     .subscribe_buttons
                     .push((view.config.id.clone(), subscribe.rect));
@@ -263,9 +264,9 @@ fn connection_row(
                 let tooltip = if view.status == ConnectionStatus::Connected
                     || view.status == ConnectionStatus::Reconnecting
                 {
-                    "断开连接"
+                    i18n::t("断开连接")
                 } else {
-                    "连接"
+                    i18n::t("连接")
                 };
                 if icons::icon_button(ui, plug, tooltip) {
                     if view.status == ConnectionStatus::Connected
@@ -290,9 +291,12 @@ fn connection_row(
                 .color(state.theme.palette().text_dim),
         );
         ui.label(
-            RichText::new(format!("· {subscription_count} 订阅"))
-                .small()
-                .color(state.theme.palette().text_faint),
+            RichText::new(i18n::fill(
+                i18n::t("· {} 订阅"),
+                &[&subscription_count.to_string()],
+            ))
+            .small()
+            .color(state.theme.palette().text_faint),
         );
     });
 }
@@ -331,7 +335,7 @@ fn subscription_row(
             };
             let name = ui
                 .add(egui::Label::new(label).sense(egui::Sense::click()))
-                .on_hover_text("选择订阅");
+                .on_hover_text(i18n::t("选择订阅"));
             if name.clicked() {
                 // The menu bar commands act on the selected subscription, and
                 // the connection it belongs to becomes the current one.
@@ -346,7 +350,7 @@ fn subscription_row(
             );
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if icons::icon_button(ui, Icon::Trash, "取消订阅") {
+                if icons::icon_button(ui, Icon::Trash, i18n::t("取消订阅")) {
                     actions.unsubscribe.push((
                         subscription.connection_id.clone(),
                         subscription.topic.clone(),
@@ -358,9 +362,9 @@ fn subscription_row(
                     Icon::Pause
                 };
                 let tooltip = if subscription.paused {
-                    "恢复显示"
+                    i18n::t("恢复显示")
                 } else {
-                    "暂停显示"
+                    i18n::t("暂停显示")
                 };
                 if icons::icon_button(ui, pause, tooltip) {
                     actions
@@ -373,7 +377,7 @@ fn subscription_row(
 
     ui.horizontal(|ui| {
         egui::ComboBox::from_id_salt(format!("sub-format-{}", subscription.id))
-            .selected_text(subscription.format.label())
+            .selected_text(crate::state::format_label(subscription.format))
             .width(80.0)
             .show_ui(ui, |ui| {
                 for format in [
@@ -384,7 +388,10 @@ fn subscription_row(
                     PayloadFormat::Base64,
                 ] {
                     if ui
-                        .selectable_label(subscription.format == format, format.label())
+                        .selectable_label(
+                            subscription.format == format,
+                            crate::state::format_label(format),
+                        )
                         .clicked()
                         && subscription.format != format
                     {

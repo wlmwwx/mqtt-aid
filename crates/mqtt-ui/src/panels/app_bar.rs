@@ -7,6 +7,7 @@
 use egui::{Align, Layout, RichText, Ui};
 use mqtt_core::models::ConnectionStatus;
 
+use crate::i18n;
 use crate::panels::menu_bar::menus;
 use crate::state::{ConnectionView, UiActions, UiState};
 use crate::theme::spacing;
@@ -40,7 +41,7 @@ pub fn app_bar(
                 menus(ui, state, actions);
 
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    if icons::icon_button(ui, Icon::Gear, "设置") {
+                    if icons::icon_button(ui, Icon::Gear, i18n::t("设置")) {
                         state.show_settings = true;
                     }
                     let theme_icon = if state.theme == crate::theme::Theme::Dark {
@@ -48,7 +49,7 @@ pub fn app_bar(
                     } else {
                         Icon::Moon
                     };
-                    if icons::icon_button(ui, theme_icon, "切换主题") {
+                    if icons::icon_button(ui, theme_icon, i18n::t("切换主题")) {
                         actions.toggle_theme = true;
                     }
                     version_label(ui);
@@ -121,7 +122,7 @@ fn status_pill(ui: &mut Ui, state: &UiState, connections: &[ConnectionView]) {
         ConnectionStatus::Error => palette.danger,
         ConnectionStatus::Disconnected => palette.text_faint,
     };
-    let label = crate::state::connection_status_label(status);
+    let label = i18n::t(crate::state::connection_status_label(status));
 
     let text_color = ui.visuals().text_color();
     let galley = ui.painter().layout_no_wrap(

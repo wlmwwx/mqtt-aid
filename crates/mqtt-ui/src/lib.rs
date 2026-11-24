@@ -5,11 +5,13 @@
 //! value that the application layer translates into engine commands.
 
 pub mod dialogs;
+pub mod i18n;
 pub mod panels;
 pub mod state;
 pub mod theme;
 pub mod widgets;
 
+pub use i18n::Language;
 pub use state::{
     AppCommand, ConnectionView, CopyKind, CopyRequest, ExportFormat, PublishPanelState, RibbonTab,
     Stats, UiActions, UiState,

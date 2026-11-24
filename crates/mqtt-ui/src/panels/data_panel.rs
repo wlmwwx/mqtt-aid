@@ -10,6 +10,7 @@ use egui_plot::{Line, Plot, PlotPoints};
 use mqtt_core::models::{DataPoint, DataSeries, MqttSubscription};
 
 use crate::ConnectionView;
+use crate::i18n;
 use crate::state::{SeriesAction, UiActions, UiState};
 use crate::theme::Palette;
 use crate::widgets::icons::{self, Icon};
@@ -43,13 +44,13 @@ pub fn data_panel(
     };
 
     ui.horizontal(|ui| {
-        let response = ui.button("+ 添加序列");
+        let response = ui.button(i18n::t("+ 添加序列"));
         layout.add_button = response.rect;
         if response.clicked() {
             state.series_draft = Some(crate::state::SeriesDraft {
                 series: DataSeries::new(
                     crate::panels::left_panel::new_id(),
-                    "新序列",
+                    i18n::t("新序列"),
                     state
                         .selected_connection
                         .clone()
@@ -62,7 +63,7 @@ pub fn data_panel(
             });
         }
         ui.label(
-            RichText::new("从消息里取值，画成曲线")
+            RichText::new(i18n::t("从消息里取值，画成曲线"))
                 .small()
                 .color(ui.visuals().weak_text_color()),
         );
@@ -73,7 +74,7 @@ pub fn data_panel(
     if series.is_empty() {
         ui.centered_and_justified(|ui| {
             ui.label(
-                RichText::new("还没有数据序列")
+                RichText::new(i18n::t("还没有数据序列"))
                     .color(ui.visuals().weak_text_color())
                     .italics(),
             );
@@ -109,26 +110,30 @@ pub fn data_panel(
 
                         let count = samples.get(&entry.id).map_or(0, |points| points.len());
                         ui.label(
-                            RichText::new(format!("{count} 点"))
+                            RichText::new(i18n::fill(i18n::t("{} 点"), &[&count.to_string()]))
                                 .small()
                                 .color(ui.visuals().weak_text_color()),
                         );
                         if let Some(last) = samples.get(&entry.id).and_then(|points| points.back())
                         {
                             ui.label(
-                                RichText::new(format!("最新 {:.3}", last.value))
-                                    .small()
-                                    .color(color),
+                                RichText::new(i18n::fill(
+                                    i18n::t("最新 {:.3}"),
+                                    &[&format!("{:.3}", last.value)],
+                                ))
+                                .small()
+                                .color(color),
                             );
                         }
 
                         ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
-                            let remove = icons::icon_button_response(ui, Icon::Trash, "删除序列");
+                            let remove =
+                                icons::icon_button_response(ui, Icon::Trash, i18n::t("删除序列"));
                             layout.remove_buttons.push((entry.id.clone(), remove.rect));
                             if remove.clicked() {
                                 actions.series.push(SeriesAction::Remove(entry.id.clone()));
                             }
-                            if icons::icon_button(ui, Icon::Pencil, "编辑序列") {
+                            if icons::icon_button(ui, Icon::Pencil, i18n::t("编辑序列")) {
                                 state.series_draft = Some(crate::state::SeriesDraft {
                                     series: entry.clone(),
                                     is_new: false,
@@ -175,8 +180,8 @@ fn chart(ui: &mut Ui, series: &[DataSeries], samples: &Samples, palette: &Palett
     // and shows its colour.
     Plot::new("data_plot")
         .height(ui.available_height().max(160.0))
-        .x_axis_label("秒")
-        .y_axis_label("数值")
+        .x_axis_label(i18n::t("秒"))
+        .y_axis_label(i18n::t("数值"))
         // The grid is a hint, not the subject: it stays quiet so that the
         // curve is the loudest thing in the panel.
         .grid_color(palette.border)
@@ -221,7 +226,7 @@ pub fn series_color(palette: &Palette, index: usize) -> Color32 {
 /// How the path of a series is shown.
 fn path_label(path: &str) -> String {
     if path.trim().is_empty() {
-        "整个负载".to_string()
+        i18n::t("整个负载").to_string()
     } else {
         path.to_string()
     }

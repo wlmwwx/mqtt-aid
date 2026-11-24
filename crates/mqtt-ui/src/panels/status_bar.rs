@@ -5,6 +5,7 @@
 
 use egui::{RichText, Ui};
 
+use crate::i18n;
 use crate::state::{ConnectionView, UiActions, UiState};
 use crate::widgets::panel_header::{self, HeaderAction};
 
@@ -15,8 +16,8 @@ pub fn status_bar(
     connections: &[ConnectionView],
     actions: &mut UiActions,
 ) {
-    let action = panel_header::panel_header(ui, "状态", |ui| {
-        if ui.button("清除消息列表").clicked() {
+    let action = panel_header::panel_header(ui, i18n::t("状态"), |ui| {
+        if ui.button(i18n::t("清除消息列表")).clicked() {
             actions
                 .commands
                 .push(crate::state::AppCommand::ClearMessages);
@@ -40,20 +41,44 @@ pub fn status_bar(
         .unwrap_or_else(|| "—".to_string());
     let status = current
         .map(|view| crate::state::connection_status_label(view.status))
-        .unwrap_or("未连接");
+        .unwrap_or(i18n::t("未连接"));
 
     let dim = ui.visuals().weak_text_color();
 
     ui.horizontal(|ui| {
-        ui.label(RichText::new(format!("连接：{name}")).color(dim));
-        ui.label(RichText::new(format!("状态：{status}")).color(dim));
-        ui.label(RichText::new(format!("接收：{}", state.stats.received)).color(dim));
-        ui.label(RichText::new(format!("发布：{}", state.stats.published)).color(dim));
-        ui.label(RichText::new(format!("{:.1} msg/s", state.stats.messages_per_second)).color(dim));
-        ui.label(RichText::new(format!("缓存：{}", state.stats.cached)).color(dim));
+        ui.label(RichText::new(i18n::fill(i18n::t("连接：{}"), &[&name])).color(dim));
+        ui.label(RichText::new(i18n::fill(i18n::t("状态：{}"), &[status])).color(dim));
+        ui.label(
+            RichText::new(i18n::fill(
+                i18n::t("接收：{}"),
+                &[&state.stats.received.to_string()],
+            ))
+            .color(dim),
+        );
+        ui.label(
+            RichText::new(i18n::fill(
+                i18n::t("发布：{}"),
+                &[&state.stats.published.to_string()],
+            ))
+            .color(dim),
+        );
+        ui.label(
+            RichText::new(i18n::fill(
+                i18n::t("{} 条/秒"),
+                &[&format!("{:.1}", state.stats.messages_per_second)],
+            ))
+            .color(dim),
+        );
+        ui.label(
+            RichText::new(i18n::fill(
+                i18n::t("缓存：{}"),
+                &[&state.stats.cached.to_string()],
+            ))
+            .color(dim),
+        );
 
         if state.paused {
-            ui.label(RichText::new("⏸ 已暂停").color(ui.visuals().warn_fg_color));
+            ui.label(RichText::new(i18n::t("⏸ 已暂停")).color(ui.visuals().warn_fg_color));
         }
     });
 }

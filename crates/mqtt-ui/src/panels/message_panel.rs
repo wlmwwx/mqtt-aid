@@ -3,6 +3,7 @@
 use egui::{RichText, Ui};
 use mqtt_core::models::MqttMessage;
 
+use crate::i18n;
 use crate::state::{ConnectionView, ExportFormat, UiActions, UiState};
 use crate::widgets::icons::{self, Icon};
 use crate::widgets::message_table;
@@ -30,7 +31,7 @@ pub fn message_panel(
 
         let search_response = ui.add(
             egui::TextEdit::singleline(&mut state.search)
-                .hint_text("搜索 topic 或 payload…")
+                .hint_text(i18n::t("搜索 topic 或 payload…"))
                 .desired_width(180.0),
         );
 
@@ -44,12 +45,12 @@ pub fn message_panel(
         egui::ComboBox::from_id_salt("filter-qos")
             .selected_text(match state.filter_qos {
                 Some(qos) => format!("QoS {qos}"),
-                None => "任意 QoS".to_string(),
+                None => i18n::t("任意 QoS").to_string(),
             })
             .width(90.0)
             .show_ui(ui, |ui| {
                 if ui
-                    .selectable_label(state.filter_qos.is_none(), "任意 QoS")
+                    .selectable_label(state.filter_qos.is_none(), i18n::t("任意 QoS"))
                     .clicked()
                 {
                     state.filter_qos = None;
@@ -66,16 +67,16 @@ pub fn message_panel(
 
         egui::ComboBox::from_id_salt("filter-retain")
             .selected_text(match state.filter_retain {
-                Some(true) => "Retained".to_string(),
-                Some(false) => "Live".to_string(),
-                None => "全部".to_string(),
+                Some(true) => i18n::t("保留").to_string(),
+                Some(false) => i18n::t("实时").to_string(),
+                None => i18n::t("全部").to_string(),
             })
             .width(90.0)
             .show_ui(ui, |ui| {
                 for (value, label) in [
-                    (None, "全部"),
-                    (Some(true), "Retained"),
-                    (Some(false), "Live"),
+                    (None, i18n::t("全部")),
+                    (Some(true), i18n::t("保留")),
+                    (Some(false), i18n::t("实时")),
                 ] {
                     if ui
                         .selectable_label(state.filter_retain == value, label)
@@ -93,12 +94,12 @@ pub fn message_panel(
                     .as_ref()
                     .and_then(|id| connections.iter().find(|view| &view.config.id == id))
                     .map(|view| view.config.name.clone())
-                    .unwrap_or_else(|| "全部连接".to_string()),
+                    .unwrap_or_else(|| i18n::t("全部连接").to_string()),
             )
             .width(120.0)
             .show_ui(ui, |ui| {
                 if ui
-                    .selectable_label(state.filter_connection.is_none(), "全部连接")
+                    .selectable_label(state.filter_connection.is_none(), i18n::t("全部连接"))
                     .clicked()
                 {
                     state.filter_connection = None;
@@ -118,13 +119,13 @@ pub fn message_panel(
 
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             egui::ComboBox::from_id_salt("export-format")
-                .selected_text("导出…")
+                .selected_text(i18n::t("导出…"))
                 .show_ui(ui, |ui| {
                     for (format, label) in [
-                        (ExportFormat::Json, "导出为 JSON"),
-                        (ExportFormat::Csv, "导出为 CSV"),
-                        (ExportFormat::Hex, "导出为 HEX"),
-                        (ExportFormat::Binary, "导出为原始字节"),
+                        (ExportFormat::Json, i18n::t("导出为 JSON")),
+                        (ExportFormat::Csv, i18n::t("导出为 CSV")),
+                        (ExportFormat::Hex, i18n::t("导出为 HEX")),
+                        (ExportFormat::Binary, i18n::t("导出为原始字节")),
                     ] {
                         if ui.button(label).clicked() {
                             actions.export = Some(format);
@@ -138,15 +139,15 @@ pub fn message_panel(
                 Icon::Pause
             };
             let tooltip = if state.paused {
-                "继续接收"
+                i18n::t("继续接收")
             } else {
-                "暂停接收"
+                i18n::t("暂停接收")
             };
             if icons::icon_button(ui, pause, tooltip) {
                 actions.toggle_pause = true;
             }
 
-            if icons::icon_button(ui, Icon::Trash, "清除消息列表") {
+            if icons::icon_button(ui, Icon::Trash, i18n::t("清除消息列表")) {
                 actions.clear_messages = true;
             }
         });
@@ -168,9 +169,11 @@ pub fn message_panel(
                 1.4,
             );
             ui.add_space(10.0);
-            ui.label(RichText::new("还没有捕获到消息").color(ui.visuals().weak_text_color()));
             ui.label(
-                RichText::new("订阅一个主题，消息就会出现在这里")
+                RichText::new(i18n::t("还没有捕获到消息")).color(ui.visuals().weak_text_color()),
+            );
+            ui.label(
+                RichText::new(i18n::t("订阅一个主题，消息就会出现在这里"))
                     .small()
                     .color(ui.visuals().weak_text_color()),
             );

@@ -7,6 +7,7 @@
 
 use egui::{Align, Layout, Rect, RichText, Stroke, Ui};
 
+use crate::i18n;
 use crate::state::{AppCommand, CenterTab, ExportFormat, RibbonTab, UiActions, UiState};
 use crate::theme::spacing;
 use crate::widgets::icons::{self, Icon};
@@ -242,7 +243,7 @@ fn ribbon_body(ui: &mut Ui, state: &mut UiState, actions: &mut UiActions) -> Vec
         icons::draw(&painter, command.icon, icon_rect, color, 1.6);
 
         let galley = painter.layout_no_wrap(
-            command.label.to_string(),
+            i18n::tc(Some("ribbon"), command.label).to_string(),
             egui::FontId::proportional(11.0),
             caption,
         );
@@ -264,7 +265,7 @@ fn ribbon_body(ui: &mut Ui, state: &mut UiState, actions: &mut UiActions) -> Vec
     for group in &groups {
         let group_width = group.commands.len() as f32 * cell;
         let galley = painter.layout_no_wrap(
-            group.name.to_string(),
+            i18n::tc(Some("group"), group.name).to_string(),
             egui::FontId::proportional(11.0),
             ui.visuals().weak_text_color(),
         );
@@ -378,14 +379,13 @@ fn tab_strip(ui: &mut Ui, state: &mut UiState) {
             ui.horizontal(|ui| {
                 for tab in RibbonTab::all() {
                     let active = state.ribbon_tab == *tab;
+                    let label = i18n::t(tab.label());
                     let text = if active {
-                        RichText::new(tab.label())
-                            .color(palette.accent_text)
-                            .strong()
+                        RichText::new(label).color(palette.accent_text).strong()
                     } else {
                         // The tabs that are not selected are still bright: they
                         // are the way to the other commands.
-                        RichText::new(tab.label()).color(palette.text)
+                        RichText::new(label).color(palette.text)
                     };
 
                     // The selected tab gets a blue plate, the way SolidCraft
@@ -402,10 +402,10 @@ fn tab_strip(ui: &mut Ui, state: &mut UiState) {
                         egui::Button::new(RichText::new("+").color(palette.text_dim))
                             .fill(egui::Color32::TRANSPARENT),
                     );
-                    response.on_hover_text("自定义工具栏");
+                    response.on_hover_text(i18n::t("自定义工具栏"));
                     ui.add(
                         egui::TextEdit::singleline(&mut state.command_search)
-                            .hint_text("搜索命令")
+                            .hint_text(i18n::t("搜索命令"))
                             .desired_width(160.0),
                     );
                 });

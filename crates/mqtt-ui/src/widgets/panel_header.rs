@@ -6,6 +6,7 @@
 
 use egui::{Color32, RichText, Ui};
 
+use crate::i18n;
 use crate::widgets::icons::{self, Icon};
 
 /// What the user asked the header to do.
@@ -56,7 +57,7 @@ pub fn panel_header(ui: &mut Ui, title: &str, mut menu: impl FnMut(&mut Ui)) -> 
             if response.clicked() {
                 action = HeaderAction::Collapse;
             }
-            response.on_hover_text("折叠面板");
+            response.on_hover_text(i18n::t("折叠面板"));
 
             let (rect, response) =
                 ui.allocate_exact_size(egui::vec2(18.0, 18.0), egui::Sense::click());
@@ -69,7 +70,7 @@ pub fn panel_header(ui: &mut Ui, title: &str, mut menu: impl FnMut(&mut Ui)) -> 
                     1.4,
                 );
             }
-            overflow = Some(response.on_hover_text("面板菜单"));
+            overflow = Some(response.on_hover_text(i18n::t("面板菜单")));
         });
 
         // The overflow menu is a popup anchored to the `…` button.

@@ -5,6 +5,7 @@ use mqtt_core::models::{
     PublishTemplate, SubscribeRequest,
 };
 
+use crate::i18n::Language;
 use crate::theme::Theme;
 
 /// A connection as the UI sees it: the configuration plus its live status.
@@ -22,6 +23,21 @@ pub fn connection_status_label(status: ConnectionStatus) -> &'static str {
         ConnectionStatus::Reconnecting => "重连中",
         ConnectionStatus::Error => "错误",
         ConnectionStatus::Disconnected => "未连接",
+    }
+}
+
+/// The name of a payload format, in the language of the interface.
+///
+/// The names of the formats are technical, but two of them are worth
+/// translating: "自动" and "文本" are words, the rest are names.
+pub fn format_label(format: PayloadFormat) -> &'static str {
+    match format {
+        PayloadFormat::Auto => crate::i18n::t("自动"),
+        PayloadFormat::Text => crate::i18n::t("文本"),
+        PayloadFormat::Hex => "HEX",
+        PayloadFormat::Json => "JSON",
+        PayloadFormat::Base64 => "Base64",
+        PayloadFormat::Binary => crate::i18n::t("二进制"),
     }
 }
 
@@ -218,6 +234,8 @@ pub struct Stats {
 #[derive(Debug, Clone)]
 pub struct UiState {
     pub theme: Theme,
+    /// The language of the interface.
+    pub language: Language,
     pub selected_connection: Option<String>,
     pub selected_subscription: Option<String>,
     pub selected_message: Option<usize>,
@@ -262,6 +280,7 @@ impl Default for UiState {
     fn default() -> Self {
         Self {
             theme: Theme::Dark,
+            language: Language::default(),
             selected_connection: None,
             selected_subscription: None,
             selected_message: None,

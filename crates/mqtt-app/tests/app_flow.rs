@@ -13,7 +13,7 @@ use mqtt_core::models::{
     SubscribeRequest,
 };
 use mqtt_engine::{MqttCommand, MqttEngine};
-use mqtt_ui::ExportFormat;
+use mqtt_ui::{ExportFormat, Language};
 
 /// Start a broker on a free port.
 fn start_broker() -> u16 {
@@ -512,4 +512,20 @@ fn exports_messages_in_every_format() {
 
     let binary = state.export_bytes(ExportFormat::Binary);
     assert_eq!(binary, vec![0x01, 0x02, b'\n']);
+}
+
+/// The language of the interface is remembered.
+///
+/// The language is a property of the application, not of the window: it
+/// comes back the way the user left it.
+#[test]
+fn remembers_the_language_of_the_interface() {
+    let directory = temporary_config("language");
+    let mut state = AppState::open_in(directory.clone());
+
+    state.ui.language = Language::English;
+    state.persist_language();
+
+    let reloaded = AppState::open_in(directory);
+    assert_eq!(reloaded.ui.language, Language::English);
 }

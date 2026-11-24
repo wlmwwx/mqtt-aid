@@ -4,6 +4,7 @@ use egui::{RichText, Ui};
 use mqtt_core::format::{FormatError, codec_for};
 use mqtt_core::models::{PayloadFormat, PublishRequest};
 
+use crate::i18n;
 use crate::state::{ConnectionView, UiActions, UiState};
 use crate::widgets::icons::{self, Icon};
 use crate::widgets::panel_header::{self, HeaderAction};
@@ -26,8 +27,8 @@ pub fn publish_panel(
     connections: &[ConnectionView],
     actions: &mut UiActions,
 ) {
-    let action = panel_header::panel_header(ui, "发布", |ui| {
-        if ui.button("清空表单").clicked() {
+    let action = panel_header::panel_header(ui, i18n::t("发布"), |ui| {
+        if ui.button(i18n::t("清空表单")).clicked() {
             state.publish.topic.clear();
             state.publish.payload.clear();
         }
@@ -48,9 +49,9 @@ pub fn publish_panel(
         .as_ref()
         .and_then(|id| connections.iter().find(|view| &view.config.id == id))
         .map(|view| view.config.name.clone())
-        .unwrap_or_else(|| "No connection".to_string());
+        .unwrap_or_else(|| i18n::t("没有连接").to_string());
 
-    ui.label("连接");
+    ui.label(i18n::tc(Some("label"), "连接"));
     let combo_width = ui.available_width();
     egui::ComboBox::from_id_salt("publish-connection")
         .selected_text(selected_name)
@@ -68,7 +69,7 @@ pub fn publish_panel(
         });
 
     ui.add_space(4.0);
-    ui.label("Topic（主题）");
+    ui.label(i18n::t("主题"));
     ui.add(
         egui::TextEdit::singleline(&mut state.publish.topic)
             .hint_text("device/001/cmd")
@@ -77,9 +78,9 @@ pub fn publish_panel(
 
     ui.add_space(4.0);
     ui.horizontal(|ui| {
-        ui.label("格式");
+        ui.label(i18n::t("格式"));
         egui::ComboBox::from_id_salt("publish-format")
-            .selected_text(state.publish.format.label())
+            .selected_text(crate::state::format_label(state.publish.format))
             .width(110.0)
             .show_ui(ui, |ui| {
                 for format in [
@@ -90,7 +91,10 @@ pub fn publish_panel(
                     PayloadFormat::Binary,
                 ] {
                     if ui
-                        .selectable_label(state.publish.format == format, format.label())
+                        .selectable_label(
+                            state.publish.format == format,
+                            crate::state::format_label(format),
+                        )
                         .clicked()
                     {
                         state.publish.format = format;
@@ -101,7 +105,7 @@ pub fn publish_panel(
     });
 
     ui.add_space(4.0);
-    ui.label("Payload（负载）");
+    ui.label(i18n::t("负载"));
     ui.add(
         egui::TextEdit::multiline(&mut state.publish.payload)
             .desired_width(f32::INFINITY)
@@ -115,7 +119,7 @@ pub fn publish_panel(
 
     // The JSON tools, next to the payload they work on.
     ui.horizontal(|ui| {
-        ui.label("缩进");
+        ui.label(i18n::t("缩进"));
         ui.add(
             egui::DragValue::new(&mut state.publish.json_indent)
                 .range(0..=8)
@@ -123,23 +127,26 @@ pub fn publish_panel(
         );
     });
     ui.horizontal(|ui| {
-        if ui.button("格式化 JSON").clicked() {
+        if ui.button(i18n::t("格式化 JSON")).clicked() {
             actions.commands.push(crate::state::AppCommand::FormatJson);
         }
-        if ui.button("压缩 JSON").clicked() {
+        if ui.button(i18n::t("压缩 JSON")).clicked() {
             actions.commands.push(crate::state::AppCommand::MinifyJson);
         }
     });
 
     let encoded = encode_payload(state.publish.format, &state.publish.payload);
+    // Whether the text is an error is remembered, not read back from the
+    // text: the text is translated, and the translation does not end with
+    // "bytes".
+    let failed = encoded.is_err();
     state.publish.validation_error = match &encoded {
-        Ok(bytes) => Some(format!("{} bytes", bytes.len())),
+        Ok(bytes) => Some(i18n::fill(i18n::t("{} 字节"), &[&bytes.len().to_string()])),
         Err(error) => Some(error.to_string()),
     };
 
     if let Some(message) = &state.publish.validation_error {
-        let is_error = !message.ends_with("bytes");
-        ui.label(RichText::new(message.clone()).small().color(if is_error {
+        ui.label(RichText::new(message.clone()).small().color(if failed {
             ui.visuals().error_fg_color
         } else {
             ui.visuals().weak_text_color()
@@ -148,14 +155,14 @@ pub fn publish_panel(
 
     ui.add_space(4.0);
     ui.horizontal(|ui| {
-        ui.label("QoS（服务质量）");
+        ui.label(i18n::t("服务质量"));
         for qos in 0..=2u8 {
             let selected = state.publish.qos == qos;
             if ui.selectable_label(selected, qos.to_string()).clicked() {
                 state.publish.qos = qos;
             }
         }
-        ui.checkbox(&mut state.publish.retain, "Retain（保留）");
+        ui.checkbox(&mut state.publish.retain, i18n::t("保留"));
     });
 
     let can_publish = state.publish.connection_id.is_some()
@@ -165,22 +172,25 @@ pub fn publish_panel(
     // The publish button is the point of the panel: it gets the accent
     // colour and the whole width of the panel.
     let accent = ui.visuals().selection.stroke.color;
-    let publish = ui.add_enabled(
-        can_publish,
-        egui::Button::new(egui::RichText::new("发布").strong().color(if can_publish {
-            egui::Color32::WHITE
-        } else {
-            ui.visuals().weak_text_color()
-        }))
-        .fill(if can_publish {
-            accent
-        } else {
-            // A muted fill, so that the button still reads as a button.
-            ui.visuals().widgets.hovered.bg_fill
-        })
-        .stroke(egui::Stroke::NONE)
-        .min_size(egui::vec2(ui.available_width(), 28.0)),
-    );
+    let publish =
+        ui.add_enabled(
+            can_publish,
+            egui::Button::new(egui::RichText::new(i18n::t("发布")).strong().color(
+                if can_publish {
+                    egui::Color32::WHITE
+                } else {
+                    ui.visuals().weak_text_color()
+                },
+            ))
+            .fill(if can_publish {
+                accent
+            } else {
+                // A muted fill, so that the button still reads as a button.
+                ui.visuals().widgets.hovered.bg_fill
+            })
+            .stroke(egui::Stroke::NONE)
+            .min_size(egui::vec2(ui.available_width(), 28.0)),
+        );
     if publish.clicked()
         && let (Some(connection_id), Ok(payload)) =
             (state.publish.connection_id.clone(), encoded.clone())
@@ -197,7 +207,7 @@ pub fn publish_panel(
 
     ui.add_space(8.0);
     ui.separator();
-    ui.label(RichText::new("模板").strong());
+    ui.label(RichText::new(i18n::t("模板")).strong());
 
     if !state.publish.templates.is_empty() {
         let templates = state.publish.templates.clone();
@@ -206,21 +216,21 @@ pub fn publish_panel(
                 if ui.button(template.name.clone()).clicked() {
                     actions.load_template.push(template.id.clone());
                 }
-                if icons::icon_button(ui, Icon::Trash, "删除模板") {
+                if icons::icon_button(ui, Icon::Trash, i18n::t("删除模板")) {
                     actions.delete_template.push(template.id.clone());
                 }
             });
         }
     } else {
         ui.label(
-            RichText::new("还没有保存模板")
+            RichText::new(i18n::t("还没有保存模板"))
                 .small()
                 .color(ui.visuals().weak_text_color())
                 .italics(),
         );
     }
 
-    if ui.button("保存当前为模板").clicked()
+    if ui.button(i18n::t("保存当前为模板")).clicked()
         && let (Some(connection_id), Ok(payload)) =
             (state.publish.connection_id.clone(), encoded.clone())
     {

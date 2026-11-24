@@ -104,6 +104,11 @@ impl AppState {
             Ok(series) => self.series = series,
             Err(error) => tracing::warn!("could not load the data series: {error}"),
         }
+        if let Ok(Some(code)) = SettingsRepo::new(storage).get("language")
+            && let Some(language) = mqtt_ui::Language::from_code(&code)
+        {
+            self.ui.language = language;
+        }
         if let Ok(Some(limit)) = SettingsRepo::new(storage).get("cache_limit")
             && let Ok(limit) = limit.parse::<usize>()
         {
@@ -126,6 +131,19 @@ impl AppState {
                 SettingsRepo::new(storage).set("cache_limit", &self.cache_limit.to_string())
         {
             tracing::warn!("could not save the cache limit: {error}");
+        }
+    }
+
+    /// Store the language of the interface.
+    ///
+    /// The language is a property of the application, not of the window: it
+    /// is remembered, so that the interface comes back in the language the
+    /// user reads.
+    pub fn persist_language(&self) {
+        if let Some(storage) = &self.storage
+            && let Err(error) = SettingsRepo::new(storage).set("language", self.ui.language.code())
+        {
+            tracing::warn!("could not save the language: {error}");
         }
     }
 

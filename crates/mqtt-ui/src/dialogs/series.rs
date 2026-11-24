@@ -4,6 +4,7 @@ use egui::RichText;
 use mqtt_core::models::MqttSubscription;
 
 use crate::ConnectionView;
+use crate::i18n;
 use crate::state::{SeriesDraft, UiState};
 
 /// The width of the dialog and of the fields in it.
@@ -22,9 +23,9 @@ pub fn series_dialog(
     let mut save = false;
 
     egui::Window::new(if draft.is_new {
-        "New data series"
+        i18n::t("新数据序列")
     } else {
-        "Edit data series"
+        i18n::t("编辑数据序列")
     })
     .collapsible(false)
     .resizable(false)
@@ -32,14 +33,14 @@ pub fn series_dialog(
     .show(ctx, |ui| {
         ui.set_width(WIDTH);
 
-        ui.label("Name");
+        ui.label(i18n::t("名称"));
         ui.add(
             egui::TextEdit::singleline(&mut draft.series.name)
-                .hint_text("温度")
+                .hint_text(i18n::t("温度"))
                 .desired_width(f32::INFINITY),
         );
 
-        ui.label("Connection");
+        ui.label(i18n::tc(Some("label"), "连接"));
         egui::ComboBox::from_id_salt("series-connection")
             .selected_text(connection_name(connections, &draft.series.connection_id))
             .width(WIDTH)
@@ -54,7 +55,7 @@ pub fn series_dialog(
                 }
             });
 
-        ui.label("Topic");
+        ui.label(i18n::t("主题"));
         // The topics of the subscriptions of the connection are offered, but
         // any topic filter can be typed.
         let topics = topics_of(subscriptions, &draft.series.connection_id);
@@ -74,23 +75,25 @@ pub fn series_dialog(
                 .desired_width(f32::INFINITY),
         );
 
-        ui.label("Field path");
+        ui.label(i18n::t("字段路径"));
         ui.add(
             egui::TextEdit::singleline(&mut draft.series.path)
                 .hint_text("data.temperature")
                 .desired_width(f32::INFINITY),
         );
         ui.label(
-            RichText::new("字段路径用点分隔，数组写作 [0]；留空表示整个负载（负载要是一个数字）")
-                .small()
-                .color(ui.visuals().weak_text_color()),
+            RichText::new(i18n::t(
+                "字段路径用点分隔，数组写作 [0]；留空表示整个负载（负载要是一个数字）",
+            ))
+            .small()
+            .color(ui.visuals().weak_text_color()),
         );
 
         ui.horizontal(|ui| {
-            if ui.button("Save").clicked() {
+            if ui.button(i18n::t("保存")).clicked() {
                 save = true;
             }
-            if ui.button("Cancel").clicked() {
+            if ui.button(i18n::t("取消")).clicked() {
                 close = true;
             }
         });
@@ -112,7 +115,7 @@ fn connection_name(connections: &[ConnectionView], connection_id: &str) -> Strin
         .iter()
         .find(|connection| connection.config.id == connection_id)
         .map(|connection| connection.config.name.clone())
-        .unwrap_or_else(|| "（连接已删除）".to_string())
+        .unwrap_or_else(|| i18n::t("（连接已删除）").to_string())
 }
 
 /// The topics of the subscriptions of one connection.

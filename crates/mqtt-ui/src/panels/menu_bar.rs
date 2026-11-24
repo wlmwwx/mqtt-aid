@@ -12,6 +12,7 @@ use egui::{Response, RichText, Ui};
 
 use mqtt_core::models::PayloadFormat;
 
+use crate::i18n;
 use crate::state::{AppCommand, CenterTab, ExportFormat, UiActions, UiState};
 
 /// One entry of a menu: its caption and the button that draws it.
@@ -28,27 +29,62 @@ pub fn menus(ui: &mut Ui, state: &mut UiState, actions: &mut UiActions) {
     let open = state.open_menu.clone();
 
     ui.horizontal(|ui| {
-        menu_button(ui, "文件", open.as_deref() == Some("文件"), |ui| {
-            file_menu(ui, state, actions);
-        });
-        menu_button(ui, "编辑", open.as_deref() == Some("编辑"), |ui| {
-            edit_menu(ui, actions);
-        });
-        menu_button(ui, "视图", open.as_deref() == Some("视图"), |ui| {
-            view_menu(ui, state, actions);
-        });
-        menu_button(ui, "连接", open.as_deref() == Some("连接"), |ui| {
-            connection_menu(ui, actions);
-        });
-        menu_button(ui, "订阅", open.as_deref() == Some("订阅"), |ui| {
-            subscription_menu(ui, actions);
-        });
-        menu_button(ui, "工具", open.as_deref() == Some("工具"), |ui| {
-            tools_menu(ui, state, actions);
-        });
-        menu_button(ui, "帮助", open.as_deref() == Some("帮助"), |ui| {
-            help_menu(ui, actions);
-        });
+        menu_button(
+            ui,
+            i18n::t("文件"),
+            open.as_deref() == Some("文件"),
+            |ui| {
+                file_menu(ui, state, actions);
+            },
+        );
+        menu_button(
+            ui,
+            i18n::t("编辑"),
+            open.as_deref() == Some("编辑"),
+            |ui| {
+                edit_menu(ui, actions);
+            },
+        );
+        menu_button(
+            ui,
+            i18n::t("视图"),
+            open.as_deref() == Some("视图"),
+            |ui| {
+                view_menu(ui, state, actions);
+            },
+        );
+        menu_button(
+            ui,
+            i18n::t("连接"),
+            open.as_deref() == Some("连接"),
+            |ui| {
+                connection_menu(ui, actions);
+            },
+        );
+        menu_button(
+            ui,
+            i18n::t("订阅"),
+            open.as_deref() == Some("订阅"),
+            |ui| {
+                subscription_menu(ui, actions);
+            },
+        );
+        menu_button(
+            ui,
+            i18n::t("工具"),
+            open.as_deref() == Some("工具"),
+            |ui| {
+                tools_menu(ui, state, actions);
+            },
+        );
+        menu_button(
+            ui,
+            i18n::t("帮助"),
+            open.as_deref() == Some("帮助"),
+            |ui| {
+                help_menu(ui, actions);
+            },
+        );
     });
 }
 
@@ -73,11 +109,12 @@ fn menu_button(ui: &mut Ui, title: &str, held_open: bool, add_contents: impl FnO
 pub fn file_menu(ui: &mut Ui, _state: &mut UiState, actions: &mut UiActions) -> Vec<Entry> {
     let mut entries = Vec::new();
 
+    let label = "新建连接…";
     entries.push(Entry {
-        label: "新建连接…",
+        label,
         response: ui
-            .button("新建连接…")
-            .on_hover_text("创建一个新的 Broker 连接"),
+            .button(i18n::t(label))
+            .on_hover_text(i18n::t("创建一个新的 Broker 连接")),
     });
     if entries[0].response.clicked() {
         actions.commands.push(AppCommand::NewConnection);
@@ -85,9 +122,10 @@ pub fn file_menu(ui: &mut Ui, _state: &mut UiState, actions: &mut UiActions) -> 
 
     ui.separator();
 
+    let label = "导出消息…";
     entries.push(Entry {
-        label: "导出消息…",
-        response: ui.button("导出消息…"),
+        label,
+        response: ui.button(i18n::t(label)),
     });
     if entries[1].response.clicked() {
         actions
@@ -97,9 +135,10 @@ pub fn file_menu(ui: &mut Ui, _state: &mut UiState, actions: &mut UiActions) -> 
 
     ui.separator();
 
+    let label = "退出";
     entries.push(Entry {
-        label: "退出",
-        response: ui.button("退出"),
+        label,
+        response: ui.button(i18n::t(label)),
     });
     if entries[2].response.clicked() {
         actions.commands.push(AppCommand::Quit);
@@ -112,9 +151,10 @@ pub fn file_menu(ui: &mut Ui, _state: &mut UiState, actions: &mut UiActions) -> 
 pub fn edit_menu(ui: &mut Ui, actions: &mut UiActions) -> Vec<Entry> {
     let mut entries = Vec::new();
 
+    let label = "清除消息列表";
     entries.push(Entry {
-        label: "清除消息列表",
-        response: ui.button("清除消息列表"),
+        label,
+        response: ui.button(i18n::t(label)),
     });
     if entries[0].response.clicked() {
         actions.commands.push(AppCommand::ClearMessages);
@@ -122,25 +162,28 @@ pub fn edit_menu(ui: &mut Ui, actions: &mut UiActions) -> Vec<Entry> {
 
     ui.separator();
 
+    let label = "复制 Topic";
     entries.push(Entry {
-        label: "复制 Topic",
-        response: ui.button("复制 Topic"),
+        label,
+        response: ui.button(i18n::t(label)),
     });
     if entries[1].response.clicked() {
         actions.commands.push(AppCommand::CopyTopic);
     }
 
+    let label = "复制 Payload";
     entries.push(Entry {
-        label: "复制 Payload",
-        response: ui.button("复制 Payload"),
+        label,
+        response: ui.button(i18n::t(label)),
     });
     if entries[2].response.clicked() {
         actions.commands.push(AppCommand::CopyPayload);
     }
 
+    let label = "复制 HEX";
     entries.push(Entry {
-        label: "复制 HEX",
-        response: ui.button("复制 HEX"),
+        label,
+        response: ui.button(i18n::t(label)),
     });
     if entries[3].response.clicked() {
         actions.commands.push(AppCommand::CopyHex);
@@ -153,14 +196,15 @@ pub fn edit_menu(ui: &mut Ui, actions: &mut UiActions) -> Vec<Entry> {
 pub fn view_menu(ui: &mut Ui, state: &mut UiState, actions: &mut UiActions) -> Vec<Entry> {
     let mut entries = Vec::new();
 
-    ui.checkbox(&mut state.show_left, "左栏");
-    ui.checkbox(&mut state.show_right, "右栏");
-    ui.checkbox(&mut state.show_status, "状态栏");
+    ui.checkbox(&mut state.show_left, i18n::t("左栏"));
+    ui.checkbox(&mut state.show_right, i18n::t("右栏"));
+    ui.checkbox(&mut state.show_status, i18n::t("状态栏"));
     ui.separator();
 
+    let label = "消息面板";
     entries.push(Entry {
-        label: "消息面板",
-        response: ui.button("消息面板"),
+        label,
+        response: ui.button(i18n::t(label)),
     });
     if entries[0].response.clicked() {
         actions
@@ -168,9 +212,10 @@ pub fn view_menu(ui: &mut Ui, state: &mut UiState, actions: &mut UiActions) -> V
             .push(AppCommand::SetCenterTab(CenterTab::Message));
     }
 
+    let label = "数据面板";
     entries.push(Entry {
-        label: "数据面板",
-        response: ui.button("数据面板"),
+        label,
+        response: ui.button(i18n::t(label)),
     });
     if entries[1].response.clicked() {
         actions
@@ -180,17 +225,19 @@ pub fn view_menu(ui: &mut Ui, state: &mut UiState, actions: &mut UiActions) -> V
 
     ui.separator();
 
+    let label = "深色主题";
     entries.push(Entry {
-        label: "深色主题",
-        response: ui.button("深色主题"),
+        label,
+        response: ui.button(i18n::t(label)),
     });
     if entries[2].response.clicked() {
         actions.commands.push(AppCommand::ToggleTheme);
     }
 
+    let label = "浅色主题";
     entries.push(Entry {
-        label: "浅色主题",
-        response: ui.button("浅色主题"),
+        label,
+        response: ui.button(i18n::t(label)),
     });
     if entries[3].response.clicked() {
         actions.commands.push(AppCommand::ToggleTheme);
@@ -203,25 +250,28 @@ pub fn view_menu(ui: &mut Ui, state: &mut UiState, actions: &mut UiActions) -> V
 pub fn connection_menu(ui: &mut Ui, actions: &mut UiActions) -> Vec<Entry> {
     let mut entries = Vec::new();
 
+    let label = "新建连接…";
     entries.push(Entry {
-        label: "新建连接…",
-        response: ui.button("新建连接…"),
+        label,
+        response: ui.button(i18n::t(label)),
     });
     if entries[0].response.clicked() {
         actions.commands.push(AppCommand::NewConnection);
     }
 
+    let label = "连接";
     entries.push(Entry {
-        label: "连接",
-        response: ui.button("连接"),
+        label,
+        response: ui.button(i18n::t(label)),
     });
     if entries[1].response.clicked() {
         actions.commands.push(AppCommand::Connect(String::new()));
     }
 
+    let label = "断开";
     entries.push(Entry {
-        label: "断开",
-        response: ui.button("断开"),
+        label,
+        response: ui.button(i18n::t(label)),
     });
     if entries[2].response.clicked() {
         actions.commands.push(AppCommand::Disconnect(String::new()));
@@ -234,9 +284,10 @@ pub fn connection_menu(ui: &mut Ui, actions: &mut UiActions) -> Vec<Entry> {
 pub fn subscription_menu(ui: &mut Ui, actions: &mut UiActions) -> Vec<Entry> {
     let mut entries = Vec::new();
 
+    let label = "新建订阅…";
     entries.push(Entry {
-        label: "新建订阅…",
-        response: ui.button("新建订阅…"),
+        label,
+        response: ui.button(i18n::t(label)),
     });
     if entries[0].response.clicked() {
         actions
@@ -244,9 +295,10 @@ pub fn subscription_menu(ui: &mut Ui, actions: &mut UiActions) -> Vec<Entry> {
             .push(AppCommand::NewSubscription(String::new()));
     }
 
+    let label = "取消订阅…";
     entries.push(Entry {
-        label: "取消订阅…",
-        response: ui.button("取消订阅…"),
+        label,
+        response: ui.button(i18n::t(label)),
     });
     if entries[1].response.clicked() {
         actions
@@ -254,9 +306,10 @@ pub fn subscription_menu(ui: &mut Ui, actions: &mut UiActions) -> Vec<Entry> {
             .push(AppCommand::Unsubscribe(String::new()));
     }
 
+    let label = "暂停 / 恢复";
     entries.push(Entry {
-        label: "暂停 / 恢复",
-        response: ui.button("暂停 / 恢复"),
+        label,
+        response: ui.button(i18n::t(label)),
     });
     if entries[2].response.clicked() {
         actions
@@ -271,7 +324,7 @@ pub fn subscription_menu(ui: &mut Ui, actions: &mut UiActions) -> Vec<Entry> {
 pub fn tools_menu(ui: &mut Ui, state: &mut UiState, actions: &mut UiActions) -> Vec<Entry> {
     let mut entries = Vec::new();
 
-    ui.label(RichText::new("消息格式").small());
+    ui.label(RichText::new(i18n::t("消息格式")).small());
     for format in [
         PayloadFormat::Auto,
         PayloadFormat::Text,
@@ -281,24 +334,26 @@ pub fn tools_menu(ui: &mut Ui, state: &mut UiState, actions: &mut UiActions) -> 
         PayloadFormat::Binary,
     ] {
         let selected = state.message_format == format;
-        let response = ui.selectable_label(selected, format.label());
+        let response = ui.selectable_label(selected, crate::state::format_label(format));
         if response.clicked() {
             actions.commands.push(AppCommand::SetFormat(format));
         }
     }
     ui.separator();
 
+    let label = "格式化 JSON";
     entries.push(Entry {
-        label: "格式化 JSON",
-        response: ui.button("格式化 JSON"),
+        label,
+        response: ui.button(i18n::t(label)),
     });
     if entries[0].response.clicked() {
         actions.commands.push(AppCommand::FormatJson);
     }
 
+    let label = "压缩 JSON";
     entries.push(Entry {
-        label: "压缩 JSON",
-        response: ui.button("压缩 JSON"),
+        label,
+        response: ui.button(i18n::t(label)),
     });
     if entries[1].response.clicked() {
         actions.commands.push(AppCommand::MinifyJson);
@@ -306,9 +361,10 @@ pub fn tools_menu(ui: &mut Ui, state: &mut UiState, actions: &mut UiActions) -> 
 
     ui.separator();
 
+    let label = "查找…";
     entries.push(Entry {
-        label: "查找…",
-        response: ui.button("查找…"),
+        label,
+        response: ui.button(i18n::t(label)),
     });
     if entries[2].response.clicked() {
         actions.commands.push(AppCommand::FocusSearch);
@@ -321,17 +377,19 @@ pub fn tools_menu(ui: &mut Ui, state: &mut UiState, actions: &mut UiActions) -> 
 pub fn help_menu(ui: &mut Ui, actions: &mut UiActions) -> Vec<Entry> {
     let mut entries = Vec::new();
 
+    let label = "快捷键";
     entries.push(Entry {
-        label: "快捷键",
-        response: ui.button("快捷键"),
+        label,
+        response: ui.button(i18n::t(label)),
     });
     if entries[0].response.clicked() {
         actions.commands.push(AppCommand::Shortcuts);
     }
 
+    let label = "关于 MQTT Assistant";
     entries.push(Entry {
-        label: "关于 MQTT Assistant",
-        response: ui.button("关于 MQTT Assistant"),
+        label,
+        response: ui.button(i18n::t(label)),
     });
     if entries[1].response.clicked() {
         actions.commands.push(AppCommand::About);
@@ -342,18 +400,18 @@ pub fn help_menu(ui: &mut Ui, actions: &mut UiActions) -> Vec<Entry> {
 
 /// The context menu of the message list.
 pub fn message_context_menu(ui: &mut Ui, actions: &mut UiActions) {
-    ui.menu_button("更多", |ui| {
-        if ui.button("复制 Topic").clicked() {
+    ui.menu_button(i18n::t("更多"), |ui| {
+        if ui.button(i18n::t("复制 Topic")).clicked() {
             actions.commands.push(AppCommand::CopyTopic);
         }
-        if ui.button("复制 Payload").clicked() {
+        if ui.button(i18n::t("复制 Payload")).clicked() {
             actions.commands.push(AppCommand::CopyPayload);
         }
-        if ui.button("复制 HEX").clicked() {
+        if ui.button(i18n::t("复制 HEX")).clicked() {
             actions.commands.push(AppCommand::CopyHex);
         }
         ui.separator();
-        if ui.button("发送到发布面板").clicked() {
+        if ui.button(i18n::t("发送到发布面板")).clicked() {
             actions.commands.push(AppCommand::SendToPublisher);
         }
     });

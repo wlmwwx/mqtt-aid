@@ -8,6 +8,7 @@ pub mod tabs;
 use egui::{RichText, Ui};
 use mqtt_core::models::{MqttMessage, PayloadFormat};
 
+use crate::i18n;
 use crate::state::{CopyKind, CopyRequest, UiActions, UiState};
 use crate::theme::spacing;
 
@@ -192,12 +193,17 @@ fn table_header(ui: &mut Ui, palette: &crate::theme::Palette, text_dim: egui::Co
 
     let rects = cells(header, &columns);
     let caption = |text: &str| egui::RichText::new(text).small().color(text_dim).strong();
-    cell(ui, rects[0], caption("时间"), false);
-    cell(ui, rects[1], caption("主题"), false);
+    cell(ui, rects[0], caption(i18n::t("时间")), false);
+    cell(ui, rects[1], caption(i18n::t("主题")), false);
     cell(ui, rects[2], caption("QoS"), false);
-    cell(ui, rects[3], caption("保留"), false);
-    cell(ui, rects[4], caption("大小"), true);
-    cell(ui, rects[5], caption("负载"), false);
+    cell(
+        ui,
+        rects[3],
+        caption(i18n::tc(Some("column"), "保留")),
+        false,
+    );
+    cell(ui, rects[4], caption(i18n::t("大小")), true);
+    cell(ui, rects[5], caption(i18n::t("负载")), false);
 
     // The hairline under the names of the columns.
     let (rect, _) =
@@ -328,7 +334,11 @@ fn message_details(
                 "{} · QoS {} · {} · {} bytes · MQTT {}",
                 format_stamp(message.received_at),
                 message.qos,
-                if message.retain { "retained" } else { "live" },
+                if message.retain {
+                    i18n::tc(Some("column"), "保留")
+                } else {
+                    i18n::t("实时")
+                },
                 message.payload.len(),
                 message.version.label()
             ))
@@ -337,44 +347,50 @@ fn message_details(
     });
 
     ui.horizontal(|ui| {
-        if ui.button("Copy topic").clicked() {
+        if ui.button(i18n::t("复制主题")).clicked() {
             actions.copy.push(CopyRequest {
                 kind: CopyKind::Topic,
                 value: message.topic.clone(),
             });
         }
-        if ui.button("Copy payload").clicked() {
+        if ui.button(i18n::t("复制负载")).clicked() {
             actions.copy.push(CopyRequest {
                 kind: CopyKind::Payload,
                 value: String::from_utf8_lossy(&message.payload).to_string(),
             });
         }
-        if ui.button("Copy hex").clicked() {
+        if ui.button(i18n::t("复制 HEX")).clicked() {
             actions.copy.push(CopyRequest {
                 kind: CopyKind::Hex,
                 value: mqtt_core::format::encode_hex(&message.payload),
             });
         }
-        if ui.button("Send to publisher").clicked() {
+        if ui.button(i18n::t("发送到发布面板")).clicked() {
             actions.send_to_publisher = Some(message.clone());
         }
     });
 
     if let Some(properties) = &message.properties {
-        egui::CollapsingHeader::new("MQTT 5.0 properties")
+        egui::CollapsingHeader::new(i18n::t("MQTT 5.0 属性"))
             .default_open(false)
             .show(ui, |ui| {
                 if let Some(content_type) = &properties.content_type {
-                    ui.label(format!("Content type: {content_type}"));
+                    ui.label(i18n::fill(i18n::t("内容类型：{}"), &[content_type]));
                 }
                 if let Some(indicator) = properties.payload_format_indicator {
-                    ui.label(format!("Payload format indicator: {indicator}"));
+                    ui.label(i18n::fill(
+                        i18n::t("负载格式标志：{}"),
+                        &[&indicator.to_string()],
+                    ));
                 }
                 if let Some(expiry) = properties.message_expiry_interval {
-                    ui.label(format!("Message expiry interval: {expiry} s"));
+                    ui.label(i18n::fill(
+                        i18n::t("消息过期时间：{} 秒"),
+                        &[&expiry.to_string()],
+                    ));
                 }
                 if let Some(response_topic) = &properties.response_topic {
-                    ui.label(format!("Response topic: {response_topic}"));
+                    ui.label(i18n::fill(i18n::t("响应主题：{}"), &[response_topic]));
                 }
                 if let Some(correlation) = &properties.correlation_data {
                     ui.label(format!(
@@ -383,13 +399,13 @@ fn message_details(
                     ));
                 }
                 for (key, value) in &properties.user_properties {
-                    ui.label(format!("User property {key} = {value}"));
+                    ui.label(i18n::fill(i18n::t("用户属性 {} = {}"), &[key, value]));
                 }
             });
     }
 
     ui.horizontal(|ui| {
-        ui.label("Format:");
+        ui.label(i18n::t("格式："));
         for format in [
             PayloadFormat::Auto,
             PayloadFormat::Text,
@@ -399,7 +415,10 @@ fn message_details(
             PayloadFormat::Binary,
         ] {
             let selected = state.message_format == format;
-            if ui.selectable_label(selected, format.label()).clicked() {
+            if ui
+                .selectable_label(selected, crate::state::format_label(format))
+                .clicked()
+            {
                 state.message_format = format;
             }
         }

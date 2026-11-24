@@ -65,6 +65,10 @@ impl eframe::App for MqttApp {
 
         self.state.pump_events();
 
+        // The language of the interface is set before anything is drawn: the
+        // texts of the window are read while it is drawn.
+        mqtt_ui::i18n::set_language(self.state.ui.language);
+
         let ctx = ui.ctx().clone();
 
         ctx.set_visuals(self.state.ui.theme.visuals());
@@ -175,10 +179,16 @@ impl eframe::App for MqttApp {
         if let Some(draft) = dialogs::subscribe_dialog(&mut self.state.ui, &ctx, &connections) {
             self.subscribe(draft);
         }
+        // The settings window may change the language: it is remembered when
+        // it does.
+        let language = self.state.ui.language;
         if let Some(limit) =
             dialogs::settings::settings_window(&ctx, &mut self.state.ui, self.state.cache_limit)
         {
             actions.set_cache_limit = Some(limit);
+        }
+        if self.state.ui.language != language {
+            self.state.persist_language();
         }
         dialogs::info::about_window(&ctx, &mut self.state.ui);
         dialogs::info::shortcuts_window(&ctx, &mut self.state.ui);

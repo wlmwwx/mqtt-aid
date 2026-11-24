@@ -188,11 +188,11 @@ fn the_editor_opens_without_any_series() {
     let text = texts(&ctx, &mut state, &[], &HashMap::new(), RawInput::default());
 
     assert!(
-        text.contains("Field path"),
+        text.contains("字段路径"),
         "the editor was not drawn:\n{text}"
     );
     assert!(
-        text.contains("New data series"),
+        text.contains("新数据序列"),
         "the editor has no title:\n{text}"
     );
 }
