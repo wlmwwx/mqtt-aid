@@ -57,9 +57,10 @@ command, so a command added to one is available in the other.
 - **Export** — captured messages as JSON, CSV, HEX or raw bytes; the binary export
   preserves the original bytes exactly.
 - **Light and dark themes**, resizable and collapsible side panels.
-- **Chinese and English** — the language of the interface is chosen in the
-  settings and remembered. The sources are written in Chinese; the other
-  languages live in one catalogue in `mqtt-ui/src/i18n.rs`.
+- **Chinese and English** — the interface follows the language of the system
+  by default, and the language can be pinned in the settings and is
+  remembered. The sources are written in Chinese; the other languages live
+  in one catalogue in `mqtt-ui/src/i18n.rs`.
 
 ## Architecture
 

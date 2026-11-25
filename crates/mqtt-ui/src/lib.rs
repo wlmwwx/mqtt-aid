@@ -11,7 +11,7 @@ pub mod state;
 pub mod theme;
 pub mod widgets;
 
-pub use i18n::Language;
+pub use i18n::{Language, LanguageChoice};
 pub use state::{
     AppCommand, ConnectionView, CopyKind, CopyRequest, ExportFormat, PublishPanelState, RibbonTab,
     Stats, UiActions, UiState,

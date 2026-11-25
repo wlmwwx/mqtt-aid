@@ -2932,6 +2932,7 @@ dependencies = [
  "mqtt-core",
  "serde",
  "serde_json",
+ "sys-locale",
 ]
 
 [[package]]

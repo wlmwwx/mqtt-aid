@@ -8,7 +8,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use egui::Context;
-use mqtt_ui::i18n::{self, Language};
+use mqtt_ui::i18n::{self, Language, LanguageChoice};
 use mqtt_ui::panels::menu_bar::menus;
 use mqtt_ui::state::{UiActions, UiState};
 
@@ -125,10 +125,10 @@ fn every_chinese_string_of_the_sources_is_in_the_catalogue() {
 fn switching_the_language_changes_the_interface() {
     let mut state = UiState::default();
 
-    i18n::set_language(Language::Chinese);
+    i18n::set_language(LanguageChoice::Chinese);
     let chinese = draw(&mut state);
 
-    i18n::set_language(Language::English);
+    i18n::set_language(LanguageChoice::English);
     let english = draw(&mut state);
 
     assert!(
@@ -152,4 +152,36 @@ fn an_unknown_language_is_chinese() {
     assert_eq!(Language::from_code("EN"), Some(Language::English));
     assert_eq!(Language::from_code("fr"), None);
     assert_eq!(Language::default(), Language::Chinese);
+}
+
+/// The interface follows the system unless it is told otherwise.
+#[test]
+fn the_interface_follows_the_system_by_default() {
+    assert_eq!(LanguageChoice::default(), LanguageChoice::System);
+    assert_eq!(
+        LanguageChoice::from_code("system"),
+        Some(LanguageChoice::System)
+    );
+    assert_eq!(
+        LanguageChoice::from_code("auto"),
+        Some(LanguageChoice::System)
+    );
+    assert_eq!(
+        LanguageChoice::from_code("zh"),
+        Some(LanguageChoice::Chinese)
+    );
+    assert_eq!(
+        LanguageChoice::from_code("en"),
+        Some(LanguageChoice::English)
+    );
+    assert_eq!(LanguageChoice::from_code("fr"), None);
+}
+
+/// The choice of the system is a real language.
+#[test]
+fn the_choice_of_the_system_resolves_to_a_language() {
+    let resolved = LanguageChoice::System.resolve();
+    assert!(matches!(resolved, Language::Chinese | Language::English));
+    assert_eq!(LanguageChoice::Chinese.resolve(), Language::Chinese);
+    assert_eq!(LanguageChoice::English.resolve(), Language::English);
 }

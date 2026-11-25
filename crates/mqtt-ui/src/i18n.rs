@@ -16,12 +16,17 @@
 //! per frame. The interface is drawn on one thread, so the thread local is
 //! the one place where the language can be read from anywhere without
 //! threading it through every function.
+//!
+//! The user may also ask the interface to follow the language of the
+//! system, which is what it does unless it is told otherwise. That choice
+//! is a `LanguageChoice`, not a `Language`: the choice has to be kept as it
+//! was made, because the settings window has to show which one is picked.
 
 use std::cell::Cell;
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
-/// The languages the interface speaks.
+/// A language the interface speaks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Language {
     /// Chinese, the language the sources are written in.
@@ -56,11 +61,95 @@ impl Language {
             _ => None,
         }
     }
+}
 
-    /// Every language, in the order they are offered.
-    pub fn all() -> &'static [Language] {
-        &[Language::Chinese, Language::English]
+/// The language the user asked the interface to speak.
+///
+/// The choice is not always a language: it may also be "the one of the
+/// system", which is what the interface does unless it is told otherwise.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LanguageChoice {
+    /// The language of the system.
+    #[default]
+    System,
+    /// Always Chinese.
+    Chinese,
+    /// Always English.
+    English,
+}
+
+impl LanguageChoice {
+    /// The name of the choice, in the language of the interface.
+    ///
+    /// The names of the languages are written in the languages themselves,
+    /// but the name of the choice has to be read, so it is written in the
+    /// language of the interface.
+    pub fn label(self) -> &'static str {
+        match self {
+            LanguageChoice::System => t("跟随系统"),
+            LanguageChoice::Chinese => Language::Chinese.label(),
+            LanguageChoice::English => Language::English.label(),
+        }
     }
+
+    /// The code the choice is stored under.
+    pub fn code(self) -> &'static str {
+        match self {
+            LanguageChoice::System => "system",
+            LanguageChoice::Chinese => Language::Chinese.code(),
+            LanguageChoice::English => Language::English.code(),
+        }
+    }
+
+    /// The choice of a code, if there is one.
+    pub fn from_code(code: &str) -> Option<LanguageChoice> {
+        let code = code.trim().to_lowercase();
+        match code.as_str() {
+            "system" | "auto" => Some(LanguageChoice::System),
+            _ => Language::from_code(&code).map(|language| match language {
+                Language::Chinese => LanguageChoice::Chinese,
+                Language::English => LanguageChoice::English,
+            }),
+        }
+    }
+
+    /// The language the choice means.
+    ///
+    /// The choice of the system is read once and then kept: the language of
+    /// the system does not change while the program runs.
+    pub fn resolve(self) -> Language {
+        match self {
+            LanguageChoice::System => system_language(),
+            LanguageChoice::Chinese => Language::Chinese,
+            LanguageChoice::English => Language::English,
+        }
+    }
+
+    /// Every choice, in the order they are offered.
+    pub fn all() -> &'static [LanguageChoice] {
+        &[
+            LanguageChoice::System,
+            LanguageChoice::Chinese,
+            LanguageChoice::English,
+        ]
+    }
+}
+
+/// The language of the system.
+///
+/// Everything that is not Chinese is English: the interface only speaks
+/// these two, and a system that speaks a third language is served better
+/// by English than by Chinese.
+pub fn system_language() -> Language {
+    static SYSTEM: OnceLock<Language> = OnceLock::new();
+    *SYSTEM.get_or_init(|| {
+        let locale = sys_locale::get_locale().unwrap_or_default();
+        if locale.to_lowercase().starts_with("zh") {
+            Language::Chinese
+        } else {
+            Language::English
+        }
+    })
 }
 
 thread_local! {
@@ -71,8 +160,8 @@ thread_local! {
 /// Set the language of the interface.
 ///
 /// The application calls this once per frame, before anything is drawn.
-pub fn set_language(language: Language) {
-    CURRENT.with(|current| current.set(language));
+pub fn set_language(choice: LanguageChoice) {
+    CURRENT.with(|current| current.set(choice.resolve()));
 }
 
 /// The language of the interface.
@@ -368,6 +457,8 @@ const CATALOGUE: &[(Option<&str>, &str, &str)] = &[
     (None, "缓存的消息", "Cached messages"),
     (None, "关闭", "Close"),
     (None, "语言", "Language"),
+    (None, "跟随系统", "Follow the system"),
+    (None, "当前系统语言：{}", "The system language is {}"),
     // The windows of information.
     (None, "关于", "About"),
     (

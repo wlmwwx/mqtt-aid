@@ -5,7 +5,7 @@ use mqtt_core::models::{
     PublishTemplate, SubscribeRequest,
 };
 
-use crate::i18n::Language;
+use crate::i18n::LanguageChoice;
 use crate::theme::Theme;
 
 /// A connection as the UI sees it: the configuration plus its live status.
@@ -234,8 +234,8 @@ pub struct Stats {
 #[derive(Debug, Clone)]
 pub struct UiState {
     pub theme: Theme,
-    /// The language of the interface.
-    pub language: Language,
+    /// The language the interface speaks.
+    pub language: LanguageChoice,
     pub selected_connection: Option<String>,
     pub selected_subscription: Option<String>,
     pub selected_message: Option<usize>,
@@ -280,7 +280,7 @@ impl Default for UiState {
     fn default() -> Self {
         Self {
             theme: Theme::Dark,
-            language: Language::default(),
+            language: LanguageChoice::default(),
             selected_connection: None,
             selected_subscription: None,
             selected_message: None,

@@ -105,7 +105,7 @@ impl AppState {
             Err(error) => tracing::warn!("could not load the data series: {error}"),
         }
         if let Ok(Some(code)) = SettingsRepo::new(storage).get("language")
-            && let Some(language) = mqtt_ui::Language::from_code(&code)
+            && let Some(language) = mqtt_ui::LanguageChoice::from_code(&code)
         {
             self.ui.language = language;
         }

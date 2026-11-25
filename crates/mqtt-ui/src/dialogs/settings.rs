@@ -3,7 +3,7 @@
 use egui::RichText;
 
 use crate::i18n;
-use crate::i18n::Language;
+use crate::i18n::LanguageChoice;
 use crate::state::UiState;
 use crate::theme::Theme;
 
@@ -46,15 +46,23 @@ pub fn settings_window(
             ui.separator();
             ui.label(RichText::new(i18n::t("语言")).strong());
             ui.horizontal(|ui| {
-                for language in Language::all() {
+                for choice in LanguageChoice::all() {
                     if ui
-                        .selectable_label(state.language == *language, language.label())
+                        .selectable_label(state.language == *choice, choice.label())
                         .clicked()
                     {
-                        state.language = *language;
+                        state.language = *choice;
                     }
                 }
             });
+            // The choice of the system is only worth anything if the user
+            // knows what the system speaks.
+            if state.language == LanguageChoice::System {
+                ui.small(RichText::new(i18n::fill(
+                    i18n::t("当前系统语言：{}"),
+                    &[LanguageChoice::System.resolve().label()],
+                )));
+            }
 
             ui.separator();
             ui.label(RichText::new(i18n::t("消息")).strong());

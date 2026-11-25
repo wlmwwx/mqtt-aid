@@ -13,7 +13,7 @@ use mqtt_core::models::{
     SubscribeRequest,
 };
 use mqtt_engine::{MqttCommand, MqttEngine};
-use mqtt_ui::{ExportFormat, Language};
+use mqtt_ui::{ExportFormat, LanguageChoice};
 
 /// Start a broker on a free port.
 fn start_broker() -> u16 {
@@ -523,9 +523,17 @@ fn remembers_the_language_of_the_interface() {
     let directory = temporary_config("language");
     let mut state = AppState::open_in(directory.clone());
 
-    state.ui.language = Language::English;
+    state.ui.language = LanguageChoice::English;
+    state.persist_language();
+
+    let reloaded = AppState::open_in(directory.clone());
+    assert_eq!(reloaded.ui.language, LanguageChoice::English);
+
+    // The choice of the system is a choice too: it comes back as it was
+    // left, and not as the language it happens to mean.
+    state.ui.language = LanguageChoice::System;
     state.persist_language();
 
     let reloaded = AppState::open_in(directory);
-    assert_eq!(reloaded.ui.language, Language::English);
+    assert_eq!(reloaded.ui.language, LanguageChoice::System);
 }

@@ -10,3 +10,4 @@ egui = { workspace = true }
 egui_plot = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+sys-locale = "0.3.2"
